@@ -896,7 +896,7 @@ namespace Seq.App.EventThreshold
             if (Holidays.Any(holiday => _startTime >= holiday.UtcStart && _startTime < holiday.UtcEnd))
             {
                 _startTime = _startTime.AddDays(1);
-                _endTime = _endTime.AddDays(1);
+                _endTime = _endTime.AddDays(_endTime.AddDays(1) < _startTime ? 2 : 1);
             }
 
             //If we updated holidays or this is a 24h instance, don't automatically put start time to the future
