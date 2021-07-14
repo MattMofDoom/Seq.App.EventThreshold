@@ -1,0 +1,59 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <!--<GeneratePackageOnBuild>true</GeneratePackageOnBuild>-->
+    <ApplicationIcon>threshold.ico</ApplicationIcon>
+    <Authors>Matt Marlor</Authors>
+    <Copyright></Copyright>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <Description>Super-powered Seq event thresholds with start/end times, measuring and suppression intervals, property matching, day of week and day of month inclusion/exclusion, and optional holiday API!</Description>
+    <PackageLicenseUrl></PackageLicenseUrl>
+    <PackageProjectUrl>https://github.com/MattMofDoom/Seq.App.EventThreshold</PackageProjectUrl>
+    <PackageIconUrl></PackageIconUrl>
+    <RepositoryUrl>https://github.com/MattMofDoom/Seq.App.EventThreshold</RepositoryUrl>
+    <RepositoryType>Github</RepositoryType>
+    <PackageTags>seq-app seq event threshold alert monitoring holidays</PackageTags>
+    <PackageIcon>threshold.png</PackageIcon>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageReleaseNotes></PackageReleaseNotes>
+    <Version>1.0.0</Version>
+    <!--    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>-->
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <OutputPath>bin\Release\</OutputPath>
+    <DocumentationFile></DocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Flurl" Version="3.0.2">
+      <GeneratePathProperty>true</GeneratePathProperty>
+      <Pack>true</Pack>
+    </PackageReference>
+    <PackageReference Include="Flurl.Http" Version="3.2.0">
+      <GeneratePathProperty>true</GeneratePathProperty>
+      <Pack>true</Pack>
+    </PackageReference>
+    <PackageReference Include="Seq.Apps" Version="5.1.0" />
+  </ItemGroup>
+
+  <Target Name="Flurl" AfterTargets="Build">
+    <Copy SourceFiles="$(PkgFlurl)\lib\$(TargetFramework)\Flurl.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(PkgFlurl_Http)\lib\$(TargetFramework)\Flurl.Http.dll" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+  <ItemGroup>
+    <None Include="threshold.png">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+    <None Include="../LICENSE">
+      <Pack>True</Pack>
+      <PackagePath></PackagePath>
+    </None>
+    <None Include="$(OutDir)/**/*" Exclude="$(OutDir)/$(MSBuildProjectName).dll;$(OutDir)/Seq.Apps.dll;$(OutDir)/Serilog.dll" Pack="true" PackagePath="lib/$(TargetFramework)" />
+    <!--<None Include="./bin/release/$(TargetFramework)/Flurl.dll" Pack="true" PackagePath="lib/$(TargetFramework)" />
+    <None Include="./bin/release/$(TargetFramework)/Flurl.Http.dll" Pack="true" PackagePath="lib/$(TargetFramework)" />-->
+  </ItemGroup>
+
+</Project>
