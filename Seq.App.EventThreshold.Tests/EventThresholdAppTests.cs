@@ -100,6 +100,13 @@ namespace Seq.App.EventThreshold.Tests
                 "Local holiday", DateTime.Today.ToString("MM/dd/yyyy"), DateTime.Today.Year.ToString(),
                 DateTime.Today.Month.ToString(), DateTime.Today.Day.ToString(), DateTime.Today.DayOfWeek.ToString());
 
+            //Handle edge condition for holiday
+            if (start.Day > holiday.LocalStart.Day)
+            {
+                start = start.AddDays(1);
+                end = end.AddDays(1);
+            }
+
             var app = Some.Reactor(start.ToString("H:mm:ss"), end.ToString("H:mm:ss"), 1, 59, 1);
             app.Attach(TestAppHost.Instance);
             app.Holidays = new List<AbstractApiHolidays> {holiday};
