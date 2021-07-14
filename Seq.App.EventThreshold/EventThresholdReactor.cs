@@ -893,19 +893,17 @@ namespace Seq.App.EventThreshold
             }
 
             //If there are holidays, account for them
-            foreach (var unused in Holidays.Where(holiday =>
-                _startTime >= holiday.UtcStart && _startTime < holiday.UtcEnd))
+            if (Holidays.Any(holiday => _startTime >= holiday.UtcStart && _startTime < holiday.UtcEnd))
             {
                 _startTime = _startTime.AddDays(1);
                 _endTime = _endTime.AddDays(1);
-                break;
             }
 
             //If we updated holidays or this is a 24h instance, don't automatically put start time to the future
             if (!_is24H && _startTime < utcDate && !isUpdateHolidays) _startTime = _startTime.AddDays(1);
 
             if (_endTime < _startTime)
-                _endTime = _endTime.AddDays(1);
+                _endTime = _endTime.AddDays(_endTime.AddDays(1) < _startTime ? 2 : 1);
 
             LogEvent(LogEventLevel.Debug,
                 isUpdateHolidays
