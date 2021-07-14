@@ -101,10 +101,11 @@ namespace Seq.App.EventThreshold.Tests
                 start.Month.ToString(), start.Day.ToString(), start.DayOfWeek.ToString());
 
             //Handle edge condition for holiday
-            if (start.Day > holiday.LocalStart.Day)
+            if (start.AddHours(1).Day > holiday.LocalStart.Day)
             {
-                start = start.AddDays(1);
-                end = end.AddDays(1);
+                holiday = new AbstractApiHolidays("Threshold Day", "", "AU", "", "AU", "Australia - New South Wales",
+                    "Local holiday", start.AddDays(1).ToString("MM/dd/yyyy"), start.Year.ToString(),
+                    start.AddDays(1).Month.ToString(), start.AddDays(1).Day.ToString(), start.DayOfWeek.ToString());
             }
 
             var app = Some.Reactor(start.ToString("H:mm:ss"), end.ToString("H:mm:ss"), 1, 59, 1);
