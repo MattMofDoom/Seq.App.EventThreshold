@@ -113,6 +113,7 @@ namespace Seq.App.EventThreshold.Tests
             app.Holidays = new List<AbstractApiHolidays> {holiday};
             app.UtcRollover(DateTime.Now.ToUniversalTime(), true);
             var showTime = app.GetShowtime();
+            _testOutputHelper.WriteLine("Holiday Local: " + holiday.LocalStart.ToString("F") );
             _testOutputHelper.WriteLine("Current UTC: " + DateTime.Now.ToUniversalTime().ToString("F"));
             _testOutputHelper.WriteLine("Current Local: " + DateTime.Now.ToString("F"));
             _testOutputHelper.WriteLine("ShowTime: " + showTime.Start.ToString("F") + " to " + showTime.End.ToString("F"));
