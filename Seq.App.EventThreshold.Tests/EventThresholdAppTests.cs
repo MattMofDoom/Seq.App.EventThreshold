@@ -100,17 +100,16 @@ namespace Seq.App.EventThreshold.Tests
                 "Local holiday", start.ToString("MM/dd/yyyy"), start.Year.ToString(),
                 start.Month.ToString(), start.Day.ToString(), start.DayOfWeek.ToString());
 
-            //Handle edge condition for holiday
-            if (start.AddHours(1).Day > holiday.LocalStart.Day)
-            {
-                holiday = new AbstractApiHolidays("Threshold Day", "", "AU", "", "AU", "Australia - New South Wales",
-                    "Local holiday", start.AddDays(1).ToString("MM/dd/yyyy"), start.Year.ToString(),
-                    start.AddDays(1).Month.ToString(), start.AddDays(1).Day.ToString(), start.DayOfWeek.ToString());
-            }
-
             var app = Some.Reactor(start.ToString("H:mm:ss"), end.ToString("H:mm:ss"), 1, 59, 1);
             app.Attach(TestAppHost.Instance);
             app.Holidays = new List<AbstractApiHolidays> {holiday};
+            //Handle edge condition for holiday
+            if (start.AddHours(1).Day > holiday.LocalStart.Day)
+            {
+                app.Holidays.Add(new AbstractApiHolidays("Threshold Day", "", "AU", "", "AU", "Australia - New South Wales",
+                    "Local holiday", start.AddDays(1).ToString("MM/dd/yyyy"), start.AddDays(1).Year.ToString(),
+                    start.AddDays(1).Month.ToString(), start.AddDays(1).Day.ToString(), start.AddDays(1).DayOfWeek.ToString()));
+            }
             app.UtcRollover(DateTime.Now.ToUniversalTime(), true);
             var showTime = app.GetShowtime();
             _testOutputHelper.WriteLine("Holiday Local: " + holiday.LocalStart.ToString("F") );
