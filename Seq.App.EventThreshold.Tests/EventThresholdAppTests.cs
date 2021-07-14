@@ -97,8 +97,8 @@ namespace Seq.App.EventThreshold.Tests
             var start = DateTime.Now.AddHours(1);
             var end = DateTime.Now.AddHours(2);
             var holiday = new AbstractApiHolidays("Threshold Day", "", "AU", "", "AU", "Australia - New South Wales",
-                "Local holiday", DateTime.Today.ToString("MM/dd/yyyy"), DateTime.Today.Year.ToString(),
-                DateTime.Today.Month.ToString(), DateTime.Today.Day.ToString(), DateTime.Today.DayOfWeek.ToString());
+                "Local holiday", start.ToString("MM/dd/yyyy"), start.Year.ToString(),
+                start.Month.ToString(), start.Day.ToString(), start.DayOfWeek.ToString());
 
             //Handle edge condition for holiday
             if (start.Day > holiday.LocalStart.Day)
