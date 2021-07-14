@@ -54,7 +54,7 @@ namespace Seq.App.EventThreshold.Tests
             var showTime = app.GetShowtime();
             _testOutputHelper.WriteLine("Current UTC: " + DateTime.Now.ToUniversalTime().ToString("F"));
             _testOutputHelper.WriteLine("ShowTime: " + showTime.Start.ToString("F") + " to " + showTime.End.ToString("F"));
-            _testOutputHelper.WriteLine("Expect Start: " + start.ToUniversalTime().ToString("F") + " to " + end.ToUniversalTime().ToString("F"));
+            _testOutputHelper.WriteLine("Expect Start: " + start.AddDays(1).ToUniversalTime().ToString("F") + " to " + end.AddDays(1).ToUniversalTime().ToString("F"));
             Assert.True(showTime.Start.ToString("F") == start.AddDays(1).ToUniversalTime().ToString("F"));
             Assert.True(showTime.End.ToString("F") == end.AddDays(1).ToUniversalTime().ToString("F"));
         }
@@ -122,6 +122,7 @@ namespace Seq.App.EventThreshold.Tests
             app.Attach(TestAppHost.Instance);
             app.UtcRollover(DateTime.Now.ToUniversalTime());
             var showTime = app.GetShowtime();
+            Assert.True(app.Holidays.Count == 0);
             _testOutputHelper.WriteLine("Current UTC: " + DateTime.Now.ToUniversalTime().ToString("F"));
             _testOutputHelper.WriteLine("ShowTime: " + showTime.Start.ToString("F") + " to " + showTime.End.ToString("F"));
             _testOutputHelper.WriteLine("Expect Start: " + start.AddDays(1).ToUniversalTime().ToString("F") + " to " + end.AddDays(1).ToUniversalTime().ToString("F"));

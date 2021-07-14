@@ -593,8 +593,8 @@ namespace Seq.App.EventThreshold
                     //Check the interval time versus threshold count
                     if (difference.TotalSeconds > _thresholdInterval.TotalSeconds)
                     {
-                        if ((InvertThreshold && EventCount >= Threshold) ||
-                            (!InvertThreshold && EventCount <= Threshold))
+                        if (InvertThreshold && EventCount >= Threshold ||
+                            !InvertThreshold && EventCount <= Threshold)
                         {
                             var suppressDiff = timeNow - _lastLog;
                             if (suppressDiff.TotalSeconds < _suppressionTime.TotalSeconds)
@@ -897,6 +897,8 @@ namespace Seq.App.EventThreshold
                 _startTime >= holiday.UtcStart && _startTime < holiday.UtcEnd))
             {
                 _startTime = _startTime.AddDays(1);
+                if (_endTime < _startTime)
+                    _endTime = _endTime.AddDays(1);
                 break;
             }
 
