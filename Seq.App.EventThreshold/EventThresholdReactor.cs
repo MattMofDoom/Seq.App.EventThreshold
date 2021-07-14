@@ -897,8 +897,7 @@ namespace Seq.App.EventThreshold
                 _startTime >= holiday.UtcStart && _startTime < holiday.UtcEnd))
             {
                 _startTime = _startTime.AddDays(1);
-                if (_endTime < _startTime)
-                    _endTime = _endTime.AddDays(1);
+                _endTime = _endTime.AddDays(1);
                 break;
             }
 
