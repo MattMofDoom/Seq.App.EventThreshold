@@ -377,8 +377,6 @@ namespace Seq.App.EventThreshold
                 case false when properties == matches:
                 {
                     EventCount++;
-                    _lastCheck = timeNow;
-
                     break;
                 }
             }
@@ -621,6 +619,7 @@ namespace Seq.App.EventThreshold
                                 _thresholdInterval.TotalSeconds, EventCount);
 
                         //Reset the threshold counter
+                        _lastCheck = timeNow;
                         EventCount = 0;
                     }
                 }
