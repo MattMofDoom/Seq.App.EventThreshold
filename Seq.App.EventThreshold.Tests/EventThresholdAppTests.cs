@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading;
 using Seq.App.EventThreshold.Classes;
 using Seq.App.EventThreshold.Tests.Support;
@@ -16,7 +17,7 @@ namespace Seq.App.EventThreshold.Tests
         {
             _testOutputHelper = testOutputHelper;
         }
-        
+
         [Fact]
         public void AppThresholds()
         {
@@ -26,17 +27,18 @@ namespace Seq.App.EventThreshold.Tests
             //Wait for showtime
             Thread.Sleep(2000);
             Assert.True(app.IsShowtime);
-            _testOutputHelper.WriteLine("Event Count: {0}", app.EventCount);
+            _testOutputHelper.WriteLine("Test Under Threshold, Event Count: {0}", app.EventCount);
             Assert.True(app.EventCount == 0);
             //Log an event and validate that we are still in showtime and matching events
             var evt = Some.LogEvent();
             app.On(evt);
             app.On(evt);
             app.On(evt);
+            _testOutputHelper.WriteLine("Test Over Threshold, Event Count: {0}", app.EventCount);
             Assert.True(app.EventCount > app.Threshold);
             //Still in showtime and still matching events
             Thread.Sleep(2000);
-            _testOutputHelper.WriteLine("Event Count: {0}", app.EventCount);
+            _testOutputHelper.WriteLine("Test Expiry, Event Count: {0}", app.EventCount);
             Assert.True(app.EventCount == 0);
             app.On(evt);
             Assert.True(app.IsShowtime);
@@ -53,8 +55,10 @@ namespace Seq.App.EventThreshold.Tests
             app.Attach(TestAppHost.Instance);
             var showTime = app.GetShowtime();
             _testOutputHelper.WriteLine("Current UTC: " + DateTime.Now.ToUniversalTime().ToString("F"));
-            _testOutputHelper.WriteLine("ShowTime: " + showTime.Start.ToString("F") + " to " + showTime.End.ToString("F"));
-            _testOutputHelper.WriteLine("Expect Start: " + start.AddDays(1).ToUniversalTime().ToString("F") + " to " + end.AddDays(1).ToUniversalTime().ToString("F"));
+            _testOutputHelper.WriteLine("ShowTime: " + showTime.Start.ToString("F") + " to " +
+                                        showTime.End.ToString("F"));
+            _testOutputHelper.WriteLine("Expect Start: " + start.AddDays(1).ToUniversalTime().ToString("F") + " to " +
+                                        end.AddDays(1).ToUniversalTime().ToString("F"));
             Assert.True(showTime.Start.ToString("F") == start.AddDays(1).ToUniversalTime().ToString("F"));
             Assert.True(showTime.End.ToString("F") == end.AddDays(1).ToUniversalTime().ToString("F"));
         }
@@ -69,8 +73,10 @@ namespace Seq.App.EventThreshold.Tests
             app.Attach(TestAppHost.Instance);
             var showTime = app.GetShowtime();
             _testOutputHelper.WriteLine("Current UTC: " + DateTime.Now.ToUniversalTime().ToString("F"));
-            _testOutputHelper.WriteLine("ShowTime: " + showTime.Start.ToString("F") + " to " + showTime.End.ToString("F"));
-            _testOutputHelper.WriteLine("Expect Start: " + start.ToUniversalTime().ToString("F") + " to " + end.ToUniversalTime().ToString("F"));
+            _testOutputHelper.WriteLine("ShowTime: " + showTime.Start.ToString("F") + " to " +
+                                        showTime.End.ToString("F"));
+            _testOutputHelper.WriteLine("Expect Start: " + start.ToUniversalTime().ToString("F") + " to " +
+                                        end.ToUniversalTime().ToString("F"));
             Assert.True(showTime.Start.ToString("F") == start.ToUniversalTime().ToString("F"));
             Assert.True(showTime.End.ToString("F") == end.ToUniversalTime().ToString("F"));
         }
@@ -85,8 +91,10 @@ namespace Seq.App.EventThreshold.Tests
             app.Attach(TestAppHost.Instance);
             var showTime = app.GetShowtime();
             _testOutputHelper.WriteLine("Current UTC: " + DateTime.Now.ToUniversalTime().ToString("F"));
-            _testOutputHelper.WriteLine("ShowTime: " + showTime.Start.ToString("F") + " to " + showTime.End.ToString("F"));
-            _testOutputHelper.WriteLine("Expect Start: " + start.AddDays(1).ToUniversalTime().ToString("F") + " to " + end.AddDays(1).ToUniversalTime().ToString("F"));
+            _testOutputHelper.WriteLine("ShowTime: " + showTime.Start.ToString("F") + " to " +
+                                        showTime.End.ToString("F"));
+            _testOutputHelper.WriteLine("Expect Start: " + start.AddDays(1).ToUniversalTime().ToString("F") + " to " +
+                                        end.AddDays(1).ToUniversalTime().ToString("F"));
             Assert.True(showTime.Start.ToString("F") == start.AddDays(1).ToUniversalTime().ToString("F"));
             Assert.True(showTime.End.ToString("F") == end.AddDays(1).ToUniversalTime().ToString("F"));
         }
@@ -94,51 +102,94 @@ namespace Seq.App.EventThreshold.Tests
         [Fact]
         public void RolloverWithHoliday()
         {
-            var start = DateTime.Now.AddHours(1);
-            var end = DateTime.Now.AddHours(2);
-            var holiday = new AbstractApiHolidays("Threshold Day", "", "AU", "", "AU", "Australia - New South Wales",
-                "Local holiday", start.ToString("MM/dd/yyyy"), start.Year.ToString(),
-                start.Month.ToString(), start.Day.ToString(), start.DayOfWeek.ToString());
+            var start = DateTime.ParseExact(DateTime.Today.ToString("yyyy-MM-dd") + " 00:01:00", "yyyy-MM-dd H:mm:ss",
+                CultureInfo.InvariantCulture, DateTimeStyles.None);
+            var end = DateTime.ParseExact(start.AddHours(1).ToString("yyyy-MM-dd H:mm:ss"), "yyyy-MM-dd H:mm:ss",
+                CultureInfo.InvariantCulture, DateTimeStyles.None);
 
             var app = Some.Reactor(start.ToString("H:mm:ss"), end.ToString("H:mm:ss"), 1, 59, 1);
+            app.TestOverrideTime = start;
+            app.UseTestOverrideTime = true;
             app.Attach(TestAppHost.Instance);
-            app.Holidays = new List<AbstractApiHolidays> {holiday};
-            //Handle edge condition for holiday
-            if (start.AddHours(1).Day > holiday.LocalStart.Day)
+
+            for (var i = 0; i < 169; i++)
             {
-                app.Holidays.Add(new AbstractApiHolidays("Threshold Day", "", "AU", "", "AU", "Australia - New South Wales",
-                    "Local holiday", start.AddDays(1).ToString("MM/dd/yyyy"), start.AddDays(1).Year.ToString(),
-                    start.AddDays(1).Month.ToString(), start.AddDays(1).Day.ToString(), start.AddDays(1).DayOfWeek.ToString()));
+                if (i > 0)
+                {
+                    app.TestOverrideTime = app.TestOverrideTime.AddHours(1);
+
+                    if (i % 24 == 0)
+                    {
+                        start = start.AddDays(1);
+                        end = start.AddHours(1);
+                    }
+                }
+
+                var holiday = new AbstractApiHolidays("Threshold Day", "", "AU", "", "AU",
+                    "Australia - New South Wales",
+                    "Local holiday", start.ToString("MM/dd/yyyy"), start.Year.ToString(),
+                    start.Month.ToString(), start.Day.ToString(), start.DayOfWeek.ToString());
+                app.Holidays = new List<AbstractApiHolidays> {holiday};
+
+                app.UtcRollover(app.TestOverrideTime.ToUniversalTime(), true);
+                var showTime = app.GetShowtime();
+                _testOutputHelper.WriteLine("Time: {0:F}, Next ShowTime: {1:F}, Matches {2}",
+                    app.TestOverrideTime.ToUniversalTime(), showTime.Start.ToUniversalTime(),
+                    showTime.Start.ToString("F") == start.AddDays(1).ToUniversalTime().ToString("F"));
+
+                Assert.True(showTime.Start.ToString("F") == start.AddDays(1).ToUniversalTime().ToString("F"));
+                Assert.True(showTime.End.ToString("F") == end.AddDays(1).ToUniversalTime().ToString("F"));
             }
-            app.UtcRollover(DateTime.Now.ToUniversalTime(), true);
-            var showTime = app.GetShowtime();
-            _testOutputHelper.WriteLine("Holiday Local: " + holiday.LocalStart.ToString("F") );
-            _testOutputHelper.WriteLine("Current UTC: " + DateTime.Now.ToUniversalTime().ToString("F"));
-            _testOutputHelper.WriteLine("Current Local: " + DateTime.Now.ToString("F"));
-            _testOutputHelper.WriteLine("ShowTime: " + showTime.Start.ToString("F") + " to " + showTime.End.ToString("F"));
-            _testOutputHelper.WriteLine("ShowTime Local: " + showTime.Start.ToLocalTime().ToString("F") + " to " + showTime.End.ToLocalTime().ToString("F"));
-            _testOutputHelper.WriteLine("Expect Start: " + start.AddDays(1).ToUniversalTime().ToString("F") + " to " + end.AddDays(1).ToUniversalTime().ToString("F"));
-            _testOutputHelper.WriteLine("Expect Start Local: " + start.AddDays(1).ToLocalTime().ToString("F") + " to " + end.AddDays(1).ToLocalTime().ToString("F"));
-            Assert.True(showTime.Start.ToString("F") == start.AddDays(1).ToUniversalTime().ToString("F"));
-            Assert.True(showTime.End.ToString("F") == end.AddDays(1).ToUniversalTime().ToString("F"));
         }
-        
+
         [Fact]
         public void RolloverWithoutHoliday()
         {
-            var start = DateTime.Now.AddHours(-1);
-            var end = DateTime.Now.AddSeconds(-1);
-            var app = Some.Reactor(start.ToString("H:mm:ss"), end.ToString("H:mm:ss"), 1, 59, 1);
+            var start = DateTime.ParseExact(DateTime.Today.ToString("yyyy-MM-dd") + " 00:01:00", "yyyy-MM-dd H:mm:ss",
+                CultureInfo.InvariantCulture, DateTimeStyles.None);
+            var end = DateTime.ParseExact(start.AddHours(1).ToString("yyyy-MM-dd H:mm:ss"), "yyyy-MM-dd H:mm:ss",
+                CultureInfo.InvariantCulture, DateTimeStyles.None);
 
+            var app = Some.Reactor(start.ToString("H:mm:ss"), end.ToString("H:mm:ss"), 1, 59, 1);
+            app.TestOverrideTime = start;
+            app.UseTestOverrideTime = true;
             app.Attach(TestAppHost.Instance);
-            app.UtcRollover(DateTime.Now.ToUniversalTime());
-            var showTime = app.GetShowtime();
-            Assert.True(app.Holidays.Count == 0);
-            _testOutputHelper.WriteLine("Current UTC: " + DateTime.Now.ToUniversalTime().ToString("F"));
-            _testOutputHelper.WriteLine("ShowTime: " + showTime.Start.ToString("F") + " to " + showTime.End.ToString("F"));
-            _testOutputHelper.WriteLine("Expect Start: " + start.AddDays(1).ToUniversalTime().ToString("F") + " to " + end.AddDays(1).ToUniversalTime().ToString("F"));
-            Assert.True(showTime.Start.ToString("F") == start.AddDays(1).ToUniversalTime().ToString("F"));
-            Assert.True(showTime.End.ToString("F") == end.AddDays(1).ToUniversalTime().ToString("F"));
+
+            for (var i = 0; i < 169; i++)
+            {
+                if (i > 0)
+                {
+                    app.TestOverrideTime = app.TestOverrideTime.AddHours(1);
+
+                    if (i % 24 == 0)
+                    {
+                        start = start.AddDays(1);
+                        end = start.AddHours(1);
+                    }
+                }
+
+                app.Holidays = new List<AbstractApiHolidays>();
+
+                app.UtcRollover(app.TestOverrideTime.ToUniversalTime());
+                var showTime = app.GetShowtime();
+
+                if (start < app.TestOverrideTime)
+                {
+                    _testOutputHelper.WriteLine("Time: {0:F}, Next ShowTime: {1:F}, Matches {2}",
+                        app.TestOverrideTime.ToUniversalTime(), showTime.Start.ToUniversalTime(),
+                        showTime.Start.ToString("F") == start.AddDays(1).ToUniversalTime().ToString("F"));
+                    Assert.True(showTime.Start.ToString("F") == start.AddDays(1).ToUniversalTime().ToString("F"));
+                    Assert.True(showTime.End.ToString("F") == end.AddDays(1).ToUniversalTime().ToString("F"));
+                }
+                else
+                {
+                    _testOutputHelper.WriteLine("Time: {0:F}, Next ShowTime: {1:F}, Matches {2}",
+                        app.TestOverrideTime.ToUniversalTime(), showTime.Start.ToUniversalTime(),
+                        showTime.Start.ToString("F") == start.ToUniversalTime().ToString("F"));
+                    Assert.True(showTime.Start.ToString("F") == start.ToUniversalTime().ToString("F"));
+                    Assert.True(showTime.End.ToString("F") == end.ToUniversalTime().ToString("F"));
+                }
+            }
         }
 
         [Fact]
@@ -156,8 +207,10 @@ namespace Seq.App.EventThreshold.Tests
         [Fact]
         public void DatesExpressed()
         {
-            _testOutputHelper.WriteLine(string.Join(",",Dates.GetDaysOfMonth("first,last,first weekday,last weekday,first monday", "12:00", "H:mm").ToArray()));
-            Assert.True(Dates.GetDaysOfMonth("first,last,first weekday,last weekday,first monday", "12:00", "H:mm").Count > 0);
+            _testOutputHelper.WriteLine(string.Join(",",
+                Dates.GetDaysOfMonth("first,last,first weekday,last weekday,first monday", "12:00", "H:mm").ToArray()));
+            Assert.True(Dates.GetDaysOfMonth("first,last,first weekday,last weekday,first monday", "12:00", "H:mm")
+                .Count > 0);
         }
 
         [Fact]

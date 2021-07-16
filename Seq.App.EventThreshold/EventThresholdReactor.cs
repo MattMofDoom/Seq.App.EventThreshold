@@ -9,15 +9,12 @@ using Seq.Apps.LogEvents;
 
 namespace Seq.App.EventThreshold
 {
-    [SeqApp("Event Threshold", AllowReprocessing = false, 
+    [SeqApp("Event Threshold", AllowReprocessing = false,
         Description =
             "Super-powered Seq event thresholds with start/end times, measuring and suppression intervals, property matching, day of week and day of month inclusion/exclusion, and optional holiday API!")]
     // ReSharper disable once UnusedType.Global
     public class EventThresholdReactor : SeqApp, ISubscribeTo<LogEventData>
     {
-        public int EventCount;
-
-        private bool _is24H;
         private string _alertDescription;
         private string _alertMessage;
         private string _apiKey;
@@ -31,12 +28,13 @@ namespace Seq.App.EventThreshold
         private int _errorCount;
         private List<int> _excludeDays;
         private List<string> _holidayMatch;
-        public List<AbstractApiHolidays> Holidays;
         private bool _includeApp;
         private bool _includeBank;
         private List<int> _includeDays;
         private bool _includeWeekends;
-        public bool IsShowtime;
+        private bool _invertThreshold;
+
+        private bool _is24H;
         private bool _isTags;
         private bool _isUpdating;
         private DateTime _lastCheck;
@@ -47,6 +45,7 @@ namespace Seq.App.EventThreshold
         private string[] _localAddresses;
 
         private List<string> _localeMatch;
+        private bool _logEventCount;
 
         private string _priority;
         private Dictionary<string, string> _properties;
@@ -62,15 +61,16 @@ namespace Seq.App.EventThreshold
         private string[] _tags;
         private string _testDate;
         private int _threshold;
-        private bool _invertThreshold;
         private TimeSpan _thresholdInterval;
         private LogEventLevel _thresholdLogLevel;
         private Timer _timer;
         private bool _useHolidays;
-        private bool _useProxy; 
-        private bool _logEventCount;
-
-        // ReSharper disable MemberCanBePrivate.Global
+        private bool _useProxy;
+        public int EventCount;
+        public List<AbstractApiHolidays> Holidays;
+        public bool IsShowtime;
+        public DateTime TestOverrideTime = DateTime.Now;
+        public bool UseTestOverrideTime; // ReSharper disable MemberCanBePrivate.Global
         // ReSharper disable UnusedAutoPropertyAccessor.Global
         // ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
         [SeqAppSetting(
@@ -98,7 +98,8 @@ namespace Seq.App.EventThreshold
 
         [SeqAppSetting(
             DisplayName = "Threshold",
-            HelpText = "Threshold for the count of events that must be seen in the configured time. If this threshold is violated, an alert will be raised. Default 100, Minimum 1.",
+            HelpText =
+                "Threshold for the count of events that must be seen in the configured time. If this threshold is violated, an alert will be raised. Default 100, Minimum 1.",
             InputType = SettingInputType.Integer)]
         public int Threshold { get; set; } = 100;
 
@@ -320,8 +321,8 @@ namespace Seq.App.EventThreshold
             HelpText = "Username for proxy authentication.",
             IsOptional = true,
             InputType = SettingInputType.Password)]
-        
-        
+
+
         public string ProxyPass { get; set; }
 
         public void On(Event<LogEventData> evt)
@@ -422,7 +423,9 @@ namespace Seq.App.EventThreshold
             }
 
             _invertThreshold = InvertThreshold;
-            if (_diagnostics) LogEvent(LogEventLevel.Debug, "Invert threshold to Greater Than or Equal To (>=): {InvertThreshold}", _invertThreshold);
+            if (_diagnostics)
+                LogEvent(LogEventLevel.Debug, "Invert threshold to Greater Than or Equal To (>=): {InvertThreshold}",
+                    _invertThreshold);
 
             if (Threshold <= 0)
                 Threshold = 1;
@@ -432,10 +435,11 @@ namespace Seq.App.EventThreshold
                     _invertThreshold
                         ? "Threshold for events is 'Greater Than or Equal To {Threshold}' ..."
                         : "Threshold for events is 'Less Than or Equal To {Threshold}' ...", _threshold);
-            
+
 
             _logEventCount = LogEventCount;
-            if (_diagnostics) LogEvent(LogEventLevel.Debug, "Log events at end of each interval {LogEventCount}", _logEventCount);
+            if (_diagnostics)
+                LogEvent(LogEventLevel.Debug, "Log events at end of each interval {LogEventCount}", _logEventCount);
 
             LogEvent(LogEventLevel.Debug,
                 "Use Holidays API {UseHolidays}, Country {Country}, Has API key {IsEmpty} ...", UseHolidays, Country,
@@ -448,11 +452,15 @@ namespace Seq.App.EventThreshold
             //Enforce minimum threshold interval
             if (ThresholdInterval <= 0)
                 ThresholdInterval = 1;
-            if (_diagnostics) LogEvent(LogEventLevel.Debug, "Convert Threshold Interval {ThresholdInterval} to TimeSpan ...", ThresholdInterval);
+            if (_diagnostics)
+                LogEvent(LogEventLevel.Debug, "Convert Threshold Interval {ThresholdInterval} to TimeSpan ...",
+                    ThresholdInterval);
 
             _thresholdInterval = TimeSpan.FromSeconds(ThresholdInterval);
-            if (_diagnostics) LogEvent(LogEventLevel.Debug, "Parsed Threshold Interval is {Interval} ...", _thresholdInterval.TotalSeconds);
-            
+            if (_diagnostics)
+                LogEvent(LogEventLevel.Debug, "Parsed Threshold Interval is {Interval} ...",
+                    _thresholdInterval.TotalSeconds);
+
             //Negative values not permitted
             if (SuppressionTime < 0)
                 SuppressionTime = 0;
@@ -531,7 +539,8 @@ namespace Seq.App.EventThreshold
                 _responders = Responders;
 
             if (_diagnostics)
-                LogEvent(LogEventLevel.Debug, "Log level {LogLevel} will be used for threshold violations on {Instance} ...",
+                LogEvent(LogEventLevel.Debug,
+                    "Log level {LogLevel} will be used for threshold violations on {Instance} ...",
                     _thresholdLogLevel, App.Title);
 
             if (_diagnostics) LogEvent(LogEventLevel.Debug, "Starting timer ...");
@@ -586,7 +595,6 @@ namespace Seq.App.EventThreshold
                             _endTime.ToShortTimeString(), _endTime.DayOfWeek);
                         IsShowtime = true;
                         _lastCheck = timeNow;
-                        
                     }
 
                     var difference = timeNow - _lastCheck;
@@ -609,7 +617,8 @@ namespace Seq.App.EventThreshold
                         }
 
                         if (_logEventCount)
-                            LogEvent(LogEventLevel.Debug, "Event count after {ThresholdInterval} seconds: {EventCount}", _thresholdInterval.TotalSeconds, EventCount);
+                            LogEvent(LogEventLevel.Debug, "Event count after {ThresholdInterval} seconds: {EventCount}",
+                                _thresholdInterval.TotalSeconds, EventCount);
 
                         //Reset the threshold counter
                         EventCount = 0;
@@ -867,12 +876,20 @@ namespace Seq.App.EventThreshold
         /// <param name="isUpdateHolidays"></param>
         public void UtcRollover(DateTime utcDate, bool isUpdateHolidays = false)
         {
-            LogEvent(LogEventLevel.Debug, "UTC Time is currently {UtcTime} ...", DateTime.Now.ToUniversalTime().ToShortTimeString());
-            
+            LogEvent(LogEventLevel.Debug, "UTC Time is currently {UtcTime} ...",
+                UseTestOverrideTime
+                    ? TestOverrideTime.ToUniversalTime().ToShortTimeString()
+                    : DateTime.Now.ToUniversalTime().ToShortTimeString());
+
             //Day rollover, we need to ensure the next start and end is in the future
             if (!string.IsNullOrEmpty(_testDate))
                 _startTime = DateTime.ParseExact(_testDate + " " + StartTime, "yyyy-M-d " + _startFormat,
                     CultureInfo.InvariantCulture, DateTimeStyles.None).ToUniversalTime();
+            else if (UseTestOverrideTime)
+                _startTime = DateTime
+                    .ParseExact(TestOverrideTime.ToString("yyyy-M-d") + " " + StartTime, "yyyy-M-d " + _startFormat,
+                        CultureInfo.InvariantCulture, DateTimeStyles.None)
+                    .ToUniversalTime();
             else
                 _startTime = DateTime
                     .ParseExact(StartTime, _startFormat, CultureInfo.InvariantCulture, DateTimeStyles.None)
@@ -880,6 +897,10 @@ namespace Seq.App.EventThreshold
 
             if (!string.IsNullOrEmpty(_testDate))
                 _endTime = DateTime.ParseExact(_testDate + " " + EndTime, "yyyy-M-d " + _endFormat,
+                    CultureInfo.InvariantCulture, DateTimeStyles.None).ToUniversalTime();
+            else if (UseTestOverrideTime)
+                _endTime = DateTime.ParseExact(TestOverrideTime.ToString("yyyy-M-d") + " " + EndTime,
+                    "yyyy-M-d " + _endFormat,
                     CultureInfo.InvariantCulture, DateTimeStyles.None).ToUniversalTime();
             else
                 _endTime = DateTime.ParseExact(EndTime, _endFormat, CultureInfo.InvariantCulture, DateTimeStyles.None)
@@ -895,12 +916,18 @@ namespace Seq.App.EventThreshold
             //If there are holidays, account for them
             if (Holidays.Any(holiday => _startTime >= holiday.UtcStart && _startTime < holiday.UtcEnd))
             {
-                _startTime = _startTime.AddDays(Holidays.Any(holiday => _startTime.AddDays(1) >= holiday.UtcStart && _startTime.AddDays(1) < holiday.UtcEnd) ? 2 : 1);
+                _startTime = _startTime.AddDays(Holidays.Any(holiday =>
+                    _startTime.AddDays(1) >= holiday.UtcStart && _startTime.AddDays(1) < holiday.UtcEnd)
+                    ? 2
+                    : 1);
                 _endTime = _endTime.AddDays(_endTime.AddDays(1) < _startTime ? 2 : 1);
             }
 
             //If we updated holidays or this is a 24h instance, don't automatically put start time to the future
-            if (!_is24H && _startTime < utcDate && !isUpdateHolidays) _startTime = _startTime.AddDays(1);
+            if (!_is24H &&
+                (!UseTestOverrideTime && _startTime < utcDate ||
+                 UseTestOverrideTime && _startTime < TestOverrideTime.ToUniversalTime()) &&
+                !isUpdateHolidays) _startTime = _startTime.AddDays(1);
 
             if (_endTime < _startTime)
                 _endTime = _endTime.AddDays(_endTime.AddDays(1) < _startTime ? 2 : 1);
