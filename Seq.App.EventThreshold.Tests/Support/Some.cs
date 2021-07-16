@@ -25,8 +25,6 @@ namespace Seq.App.EventThreshold.Tests.Support
             return Uint();
         }
 
-        public abstract class ParametersMustBeNamed { }
-        
         public static Event<LogEventData> LogEvent(
             ParametersMustBeNamed _ = null,
             LogEventLevel level = LogEventLevel.Fatal,
@@ -51,10 +49,7 @@ namespace Seq.App.EventThreshold.Tests.Support
                     RenderedMessage = "Hello, world",
                     Properties = properties
                 });
-            foreach (var (key, value) in include)
-            {
-                properties.Add(key, value);
-            }
+            foreach (var (key, value) in include) properties.Add(key, value);
 
             return new Event<LogEventData>(id, EventType(), timestamp, new LogEventData
             {
@@ -80,10 +75,11 @@ namespace Seq.App.EventThreshold.Tests.Support
 
         public static Host Host()
         {
-            return new Host("https://seq.example.com", String() );
+            return new Host("https://seq.example.com", String());
         }
 
-        public static EventThresholdReactor Reactor(string start, string end, int interval, int suppression, int threshold, bool invert = false, string textMatch = "Event That Is Not Matchable")
+        public static EventThresholdReactor Reactor(string start, string end, int interval, int suppression,
+            int threshold, bool invert = false, string textMatch = "Event That Is Not Matchable")
         {
             return new EventThresholdReactor
             {
@@ -103,8 +99,11 @@ namespace Seq.App.EventThreshold.Tests.Support
                 AlertDescription = "An alert has arisen!",
                 Tags = "Alert,Message",
                 IncludeApp = true
-
             };
+        }
+
+        public abstract class ParametersMustBeNamed
+        {
         }
     }
 }
