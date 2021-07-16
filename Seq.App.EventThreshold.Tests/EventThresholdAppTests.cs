@@ -27,21 +27,29 @@ namespace Seq.App.EventThreshold.Tests
             //Wait for showtime
             Thread.Sleep(2000);
             Assert.True(app.IsShowtime);
-            _testOutputHelper.WriteLine("Test Under Threshold, Event Count: {0}", app.EventCount);
+            Thread.Sleep(2000);
+            Assert.True(app.IsAlert);
             Assert.True(app.EventCount == 0);
             //Log an event and validate that we are still in showtime and matching events
             var evt = Some.LogEvent();
             app.On(evt);
             app.On(evt);
             app.On(evt);
-            _testOutputHelper.WriteLine("Test Over Threshold, Event Count: {0}", app.EventCount);
-            Assert.True(app.EventCount > app.Threshold);
+            var isAlert = true;
+            for (var i = 1; i < 1001; i++)
+            {
+                Thread.Sleep(1);
+                if (app.IsAlert) continue;
+                isAlert = false;
+                break;
+            }
+            
+            Assert.False(isAlert);
+            
             //Still in showtime and still matching events
             Thread.Sleep(2000);
-            _testOutputHelper.WriteLine("Test Expiry, Event Count: {0}", app.EventCount);
-            Assert.True(app.EventCount == 0);
-            app.On(evt);
             Assert.True(app.IsShowtime);
+            Assert.True(app.IsAlert);
             Assert.True(app.EventCount <= app.Threshold);
         }
 
