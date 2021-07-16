@@ -68,6 +68,7 @@ namespace Seq.App.EventThreshold
         private bool _useProxy;
         public int EventCount;
         public List<AbstractApiHolidays> Holidays;
+        public bool IsAlert;
         public bool IsShowtime;
         public DateTime TestOverrideTime = DateTime.Now;
         public bool UseTestOverrideTime; // ReSharper disable MemberCanBePrivate.Global
@@ -329,7 +330,6 @@ namespace Seq.App.EventThreshold
         {
             if (evt == null) throw new ArgumentNullException(nameof(evt));
 
-            var timeNow = DateTime.UtcNow;
             var cannotMatch = false;
             var cannotMatchProperties = new List<string>();
             var properties = 0;
@@ -587,7 +587,7 @@ namespace Seq.App.EventThreshold
                     if (!IsShowtime)
                     {
                         LogEvent(LogEventLevel.Debug,
-                            "UTC Start Time {Time} ({DayOfWeek}), monitoring for {MatchText} over every {Threshold} seconds, until UTC End time {EndTime} ({EndDayOfWeek}) ...",
+                            "UTC Start Time {Time} ({DayOfWeek}), monitoring for {MatchText} over {Threshold} seconds, until UTC End time {EndTime} ({EndDayOfWeek}) ...",
                             _startTime.ToShortTimeString(), _startTime.DayOfWeek,
                             PropertyMatch.MatchConditions(_properties), _thresholdInterval.TotalSeconds,
                             _endTime.ToShortTimeString(), _endTime.DayOfWeek);
@@ -599,19 +599,23 @@ namespace Seq.App.EventThreshold
                     //Check the interval time versus threshold count
                     if (difference.TotalSeconds > _thresholdInterval.TotalSeconds)
                     {
-                        if (InvertThreshold && EventCount >= Threshold ||
-                            !InvertThreshold && EventCount <= Threshold)
+                        if (InvertThreshold && EventCount >= _threshold ||
+                            !InvertThreshold && EventCount < _threshold)
                         {
                             var suppressDiff = timeNow - _lastLog;
-                            if (suppressDiff.TotalSeconds < _suppressionTime.TotalSeconds)
-                            {
-                                //Log event
+                            if (IsAlert && suppressDiff.TotalSeconds < _suppressionTime.TotalSeconds) return;
+
+                            //Log event
                                 LogEvent(_thresholdLogLevel,
                                     string.IsNullOrEmpty(_alertDescription) ? "{Message}" : "{Message} : {Description}",
                                     _alertMessage, _alertDescription);
 
                                 _lastLog = timeNow;
-                            }
+                                IsAlert = true;
+                        }
+                        else
+                        {
+                            IsAlert = false;
                         }
 
                         if (_logEventCount)
