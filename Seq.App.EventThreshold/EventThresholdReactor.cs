@@ -352,7 +352,7 @@ namespace Seq.App.EventThreshold
                         if (key.Key.Equals(property.Key, StringComparison.OrdinalIgnoreCase))
                         {
                             matchedKey = true;
-                            if (!PropertyMatch.Matches(evt.Data.Properties[property.Key].ToString(),
+                            if (string.IsNullOrEmpty(property.Value) || !PropertyMatch.Matches(evt.Data.Properties[property.Key].ToString(),
                                 property.Value)) continue;
                             matches++;
                             break;
