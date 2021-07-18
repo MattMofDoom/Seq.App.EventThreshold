@@ -969,10 +969,11 @@ namespace Seq.App.EventThreshold
             if (_isTags)
                 Log.ForContext(nameof(Tags), _tags).ForContext("AppName", App.Title)
                     .ForContext(nameof(Priority), _priority).ForContext(nameof(Responders), _responders)
+                    .ForContext(nameof(EventCount), EventCount)
                     .Write((Serilog.Events.LogEventLevel) logLevel, message, logArgs);
             else
                 Log.ForContext("AppName", App.Title).ForContext(nameof(Priority), _priority)
-                    .ForContext(nameof(Responders), _responders)
+                    .ForContext(nameof(Responders), _responders).ForContext(nameof(EventCount), EventCount)
                     .Write((Serilog.Events.LogEventLevel) logLevel, message, logArgs);
         }
 
