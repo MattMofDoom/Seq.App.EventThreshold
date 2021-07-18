@@ -16,8 +16,8 @@
     <PackageTags>seq-app seq event threshold alert monitoring holidays</PackageTags>
     <PackageIcon>threshold.png</PackageIcon>
     <PackageLicenseFile>LICENSE</PackageLicenseFile>
-    <PackageReleaseNotes>* Add EventCount property to all events logged</PackageReleaseNotes>
-    <Version>1.0.4</Version>
+    <PackageReleaseNotes>- Add EventCount property to all events logged</PackageReleaseNotes>
+    <Version>1.0.5</Version>
     <!--    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>-->
   </PropertyGroup>
 
