@@ -45,9 +45,9 @@ namespace Seq.App.EventThreshold.Tests
                 isAlert = false;
                 break;
             }
-            
+
             Assert.False(isAlert);
-            
+
             //Still in showtime and still matching events
             Thread.Sleep(2000);
             Assert.True(app.IsShowtime);
@@ -218,8 +218,10 @@ namespace Seq.App.EventThreshold.Tests
         public void DatesExpressed()
         {
             _testOutputHelper.WriteLine(string.Join(",",
-                Dates.GetDaysOfMonth("first,last,first weekday,last weekday,first monday", "12:00", "H:mm", DateTime.Now).ToArray()));
-            Assert.True(Dates.GetDaysOfMonth("first,last,first weekday,last weekday,first monday", "12:00", "H:mm", DateTime.Now)
+                Dates.GetDaysOfMonth("first,last,first weekday,last weekday,first monday", "12:00", "H:mm",
+                    DateTime.Now).ToArray()));
+            Assert.True(Dates
+                .GetDaysOfMonth("first,last,first weekday,last weekday,first monday", "12:00", "H:mm", DateTime.Now)
                 .Count > 0);
         }
 
