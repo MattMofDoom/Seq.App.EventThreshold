@@ -6,6 +6,8 @@ using System.Timers;
 using Seq.App.EventThreshold.Classes;
 using Seq.Apps;
 using Seq.Apps.LogEvents;
+using Lurgle.Dates;
+using Lurgle.Dates.Classes;
 
 namespace Seq.App.EventThreshold
 {
@@ -26,11 +28,11 @@ namespace Seq.App.EventThreshold
         private string _endFormat = "H:mm:ss";
         private DateTime _endTime;
         private int _errorCount;
-        private List<int> _excludeDays;
+        public List<DateTime> ExcludeDays;
         private List<string> _holidayMatch;
         private bool _includeApp;
         private bool _includeBank;
-        private List<int> _includeDays;
+        public List<DateTime> IncludeDays;
         private bool _includeWeekends;
         private bool _invertThreshold;
 
@@ -471,7 +473,7 @@ namespace Seq.App.EventThreshold
 
             if (_diagnostics)
                 LogEvent(LogEventLevel.Debug, "Convert Days of Week {DaysOfWeek} to UTC Days of Week ...", DaysOfWeek);
-            _daysOfWeek = Dates.GetDaysOfWeek(DaysOfWeek, StartTime, _startFormat);
+            _daysOfWeek = Dates.GetUtcDaysOfWeek(DaysOfWeek, StartTime, _startFormat);
 
             if (_diagnostics)
                 LogEvent(LogEventLevel.Debug, "UTC Days of Week {DaysOfWeek} will be used ...", _daysOfWeek.ToArray());
@@ -479,18 +481,18 @@ namespace Seq.App.EventThreshold
             if (_diagnostics)
                 LogEvent(LogEventLevel.Debug, "Validate Include Days of Month {IncludeDays} ...", IncludeDaysOfMonth);
 
-            _includeDays = Dates.GetDaysOfMonth(IncludeDaysOfMonth, StartTime, _startFormat);
-            if (_includeDays.Count > 0)
-                LogEvent(LogEventLevel.Debug, "Include UTC Days of Month: {IncludeDays} ...", _includeDays.ToArray());
+            IncludeDays = Dates.GetUtcDaysOfMonth(IncludeDaysOfMonth, StartTime, _startFormat, DateTime.Now);
+            if (IncludeDays.Count > 0)
+                LogEvent(LogEventLevel.Debug, "Include UTC Days of Month: {IncludeDays} ...", IncludeDays.ToArray());
             else
                 LogEvent(LogEventLevel.Debug, "Include UTC Days of Month: ALL ...");
 
             if (_diagnostics)
                 LogEvent(LogEventLevel.Debug, "Validate Exclude Days of Month {ExcludeDays} ...", ExcludeDaysOfMonth);
 
-            _excludeDays = Dates.GetDaysOfMonth(ExcludeDaysOfMonth, StartTime, _startFormat);
-            if (_excludeDays.Count > 0)
-                LogEvent(LogEventLevel.Debug, "Exclude UTC Days of Month: {ExcludeDays} ...", _excludeDays.ToArray());
+            ExcludeDays = Dates.GetUtcDaysOfMonth(ExcludeDaysOfMonth, StartTime, _startFormat, DateTime.Now);
+            if (ExcludeDays.Count > 0)
+                LogEvent(LogEventLevel.Debug, "Exclude UTC Days of Month: {ExcludeDays} ...", ExcludeDays.ToArray());
             else
                 LogEvent(LogEventLevel.Debug, "Exclude UTC Days of Month: NONE ...");
 
@@ -568,16 +570,16 @@ namespace Seq.App.EventThreshold
                 timeNow < _endTime)
             {
                 if (!IsShowtime && (!_daysOfWeek.Contains(_startTime.DayOfWeek) ||
-                                    _includeDays.Count > 0 && !_includeDays.Contains(_startTime.Day) ||
-                                    _excludeDays.Contains(_startTime.Day)))
+                                    IncludeDays.Count > 0 && !IncludeDays.Contains(_startTime) ||
+                                    ExcludeDays.Contains(_startTime)))
                 {
                     //Log that we have skipped a day due to an exclusion
                     if (!_skippedShowtime)
                         LogEvent(LogEventLevel.Debug,
                             "Threshold checking will not be performed due to exclusions - Day of Week Excluded {DayOfWeek}, Day Of Month Not Included {IncludeDay}, Day of Month Excluded {ExcludeDay} ...",
                             !_daysOfWeek.Contains(_startTime.DayOfWeek),
-                            _includeDays.Count > 0 && !_includeDays.Contains(_startTime.Day),
-                            _excludeDays.Count > 0 && _excludeDays.Contains(_startTime.Day));
+                            IncludeDays.Count > 0 && !IncludeDays.Contains(_startTime),
+                            ExcludeDays.Count > 0 && ExcludeDays.Contains(_startTime));
 
                     _skippedShowtime = true;
                 }
@@ -649,15 +651,15 @@ namespace Seq.App.EventThreshold
                 !string.IsNullOrEmpty(_testDate)) return;
             UtcRollover(timeNow);
             //Take the opportunity to refresh include/exclude days to allow for month rollover
-            _includeDays = Dates.GetDaysOfMonth(IncludeDaysOfMonth, StartTime, _startFormat);
-            if (_includeDays.Count > 0)
+            IncludeDays = Dates.GetUtcDaysOfMonth(IncludeDaysOfMonth, StartTime, _startFormat, DateTime.Now);
+            if (IncludeDays.Count > 0)
                 LogEvent(LogEventLevel.Debug, "Include UTC Days of Month: {includedays} ...",
-                    _includeDays.ToArray());
+                    IncludeDays.ToArray());
 
-            _excludeDays = Dates.GetDaysOfMonth(ExcludeDaysOfMonth, StartTime, _startFormat);
-            if (_excludeDays.Count > 0)
+            ExcludeDays = Dates.GetUtcDaysOfMonth(ExcludeDaysOfMonth, StartTime, _startFormat, DateTime.Now);
+            if (ExcludeDays.Count > 0)
                 LogEvent(LogEventLevel.Debug, "Exclude UTC Days of Month: {excludedays} ...",
-                    _excludeDays.ToArray());
+                    ExcludeDays.ToArray());
         }
 
         /// <summary>
@@ -728,7 +730,7 @@ namespace Seq.App.EventThreshold
                 {
                     if (_diagnostics) LogEvent(LogEventLevel.Debug, "Validate Country {Country}", Country);
 
-                    if (Classes.Holidays.ValidateCountry(Country))
+                    if (Lurgle.Dates.Holidays.ValidateCountry(Country))
                     {
                         _useHolidays = true;
                         _retryCount = 10;
@@ -769,7 +771,7 @@ namespace Seq.App.EventThreshold
                                 _useProxy, _proxy, _bypassLocal,
                                 !string.IsNullOrEmpty(ProxyUser) && !string.IsNullOrEmpty(ProxyPass));
 
-                        WebClient.SetFlurlConfig(App.Title, _useProxy, _proxy, _proxyUser, _proxyPass, _bypassLocal,
+                        WebClient.SetConfig(App.Title, _useProxy, _proxy, _proxyUser, _proxyPass, _bypassLocal,
                             _localAddresses);
                     }
                     else
@@ -825,7 +827,7 @@ namespace Seq.App.EventThreshold
                 {
                     _lastUpdate = DateTime.Now;
                     var result = WebClient.GetHolidays(_apiKey, _country, localDate).Result;
-                    Holidays = Classes.Holidays.ValidateHolidays(result, _holidayMatch, _localeMatch, _includeBank,
+                    Holidays = Lurgle.Dates.Holidays.ValidateHolidays(result, _holidayMatch, _localeMatch, _includeBank,
                         _includeWeekends);
                     _lastDay = localDate;
                     _errorCount = 0;
