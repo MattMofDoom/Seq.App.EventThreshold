@@ -3,9 +3,13 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Timers;
+using Lurgle.Dates;
+using Lurgle.Dates.Classes;
 using Seq.App.EventThreshold.Classes;
 using Seq.Apps;
 using Seq.Apps.LogEvents;
+
+// ReSharper disable MemberCanBePrivate.Global
 
 namespace Seq.App.EventThreshold
 {
@@ -15,6 +19,7 @@ namespace Seq.App.EventThreshold
     // ReSharper disable once UnusedType.Global
     public class EventThresholdReactor : SeqApp, ISubscribeTo<LogEventData>
     {
+        private static readonly Dictionary<string, string> ResponderLookup = new Dictionary<string, string>();
         private string _alertDescription;
         private string _alertMessage;
         private string _apiKey;
@@ -23,15 +28,16 @@ namespace Seq.App.EventThreshold
         private string _country;
         private List<DayOfWeek> _daysOfWeek;
         private bool _diagnostics;
+        private string _dueDate;
         private string _endFormat = "H:mm:ss";
         private DateTime _endTime;
         private int _errorCount;
-        private List<int> _excludeDays;
         private List<string> _holidayMatch;
         private bool _includeApp;
         private bool _includeBank;
-        private List<int> _includeDays;
+        private bool _includeDescription;
         private bool _includeWeekends;
+        private string _initialTimeEstimate;
         private bool _invertThreshold;
 
         private bool _is24H;
@@ -48,10 +54,12 @@ namespace Seq.App.EventThreshold
         private bool _logEventCount;
 
         private string _priority;
+        private string _projectKey;
         private Dictionary<string, string> _properties;
         private string _proxy;
         private string _proxyPass;
         private string _proxyUser;
+        private string _remainingTimeEstimate;
         private string _responders;
         private int _retryCount;
         private bool _skippedShowtime;
@@ -67,11 +75,14 @@ namespace Seq.App.EventThreshold
         private bool _useHolidays;
         private bool _useProxy;
         public int EventCount;
+        public List<DateTime> ExcludeDays;
         public List<AbstractApiHolidays> Holidays;
+        public List<DateTime> IncludeDays;
         public bool IsAlert;
         public bool IsShowtime;
         public DateTime TestOverrideTime = DateTime.Now;
         public bool UseTestOverrideTime; // ReSharper disable MemberCanBePrivate.Global
+
         // ReSharper disable UnusedAutoPropertyAccessor.Global
         // ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
         [SeqAppSetting(
@@ -139,6 +150,26 @@ namespace Seq.App.EventThreshold
             HelpText = "Optional Responders property to pass for threshold violations, for use with other apps.",
             IsOptional = true)]
         public string Responders { get; set; }
+
+        [SeqAppSetting(DisplayName = "Project Key for scheduled logs",
+            HelpText = "Optional Project Key property to pass for scheduled logs, for use with other apps.",
+            IsOptional = true)]
+        public string ProjectKey { get; set; }
+
+        [SeqAppSetting(DisplayName = "Initial Time Estimate for scheduled logs",
+            HelpText = "Optional Initial Time Estimate property to pass for scheduled logs, for use with other apps.",
+            IsOptional = true)]
+        public string InitialTimeEstimate { get; set; }
+
+        [SeqAppSetting(DisplayName = "Remaining Time Estimate for scheduled logs",
+            HelpText = "Optional Remaining Time Estimate property to pass for scheduled logs, for use with other apps.",
+            IsOptional = true)]
+        public string RemainingTimeEstimate { get; set; }
+
+        [SeqAppSetting(DisplayName = "Due Date for scheduled logs",
+            HelpText = "Optional Due Date property to pass for scheduled logs, for use with other apps.",
+            IsOptional = true)]
+        public string DueDate { get; set; }
 
         [SeqAppSetting(
             DisplayName = "Days of week",
@@ -218,19 +249,28 @@ namespace Seq.App.EventThreshold
 
         [SeqAppSetting(
             DisplayName = "Alert message",
-            HelpText = "Event message to raise.")]
+            HelpText =
+                "Event message to raise. Allows tokens for date parts: Day: {d}/{dd}/{ddd}/{dddd}, Month: {M}/{MM}/{MMM}/{MMMM}, Year: {yy}/{yyyy}. These are not case sensitive.")]
         public string AlertMessage { get; set; }
 
         [SeqAppSetting(
             IsOptional = true,
             DisplayName = "Alert description",
-            HelpText = "Optional description associated with the event raised.")]
+            HelpText =
+                "Optional description associated with the event raised. Allows tokens for date parts: Day: {d}/{dd}/{ddd}/{dddd}, Month: {M}/{MM}/{MMM}/{MMMM}, Year: {yy}/{yyyy}. These are not case sensitive.")]
         public string AlertDescription { get; set; }
+
+        [SeqAppSetting(
+            DisplayName = "Include description with log message",
+            HelpText =
+                "If selected, the configured description will be part of the log message. Otherwise it will only show as a log property, which can be used by other Seq apps.")]
+        public bool? IncludeDescription { get; set; } = false;
 
         [SeqAppSetting(
             IsOptional = true,
             DisplayName = "Alert tags",
-            HelpText = "Tags for the event, separated by commas.")]
+            HelpText =
+                "Tags for the event, separated by commas.  Allows tokens for date parts: Day: {d}/{dd}/{ddd}/{dddd}, Month: {M}/{MM}/{MMM}/{MMMM}, Year: {yy}/{yyyy}. These are not case sensitive.")]
         public string Tags { get; set; }
 
         [SeqAppSetting(
@@ -352,7 +392,8 @@ namespace Seq.App.EventThreshold
                         if (key.Key.Equals(property.Key, StringComparison.OrdinalIgnoreCase))
                         {
                             matchedKey = true;
-                            if (string.IsNullOrEmpty(property.Value) || !PropertyMatch.Matches(evt.Data.Properties[property.Key].ToString(),
+                            if (string.IsNullOrEmpty(property.Value) || !PropertyMatch.Matches(
+                                evt.Data.Properties[property.Key].ToString(),
                                 property.Value)) continue;
                             matches++;
                             break;
@@ -471,7 +512,7 @@ namespace Seq.App.EventThreshold
 
             if (_diagnostics)
                 LogEvent(LogEventLevel.Debug, "Convert Days of Week {DaysOfWeek} to UTC Days of Week ...", DaysOfWeek);
-            _daysOfWeek = Dates.GetDaysOfWeek(DaysOfWeek, StartTime, _startFormat);
+            _daysOfWeek = Dates.GetUtcDaysOfWeek(DaysOfWeek, StartTime, _startFormat);
 
             if (_diagnostics)
                 LogEvent(LogEventLevel.Debug, "UTC Days of Week {DaysOfWeek} will be used ...", _daysOfWeek.ToArray());
@@ -479,18 +520,18 @@ namespace Seq.App.EventThreshold
             if (_diagnostics)
                 LogEvent(LogEventLevel.Debug, "Validate Include Days of Month {IncludeDays} ...", IncludeDaysOfMonth);
 
-            _includeDays = Dates.GetDaysOfMonth(IncludeDaysOfMonth, StartTime, _startFormat);
-            if (_includeDays.Count > 0)
-                LogEvent(LogEventLevel.Debug, "Include UTC Days of Month: {IncludeDays} ...", _includeDays.ToArray());
+            IncludeDays = Dates.GetUtcDaysOfMonth(IncludeDaysOfMonth, StartTime, _startFormat, DateTime.Now);
+            if (IncludeDays.Count > 0)
+                LogEvent(LogEventLevel.Debug, "Include UTC Days of Month: {IncludeDays} ...", IncludeDays.ToArray());
             else
                 LogEvent(LogEventLevel.Debug, "Include UTC Days of Month: ALL ...");
 
             if (_diagnostics)
                 LogEvent(LogEventLevel.Debug, "Validate Exclude Days of Month {ExcludeDays} ...", ExcludeDaysOfMonth);
 
-            _excludeDays = Dates.GetDaysOfMonth(ExcludeDaysOfMonth, StartTime, _startFormat);
-            if (_excludeDays.Count > 0)
-                LogEvent(LogEventLevel.Debug, "Exclude UTC Days of Month: {ExcludeDays} ...", _excludeDays.ToArray());
+            ExcludeDays = Dates.GetUtcDaysOfMonth(ExcludeDaysOfMonth, StartTime, _startFormat, DateTime.Now);
+            if (ExcludeDays.Count > 0)
+                LogEvent(LogEventLevel.Debug, "Exclude UTC Days of Month: {ExcludeDays} ...", ExcludeDays.ToArray());
             else
                 LogEvent(LogEventLevel.Debug, "Exclude UTC Days of Month: NONE ...");
 
@@ -519,6 +560,12 @@ namespace Seq.App.EventThreshold
                 LogEvent(LogEventLevel.Debug, "Alert Description '{AlertDescription}' will be used ...",
                     _alertDescription);
 
+            if (IncludeDescription != null)
+                _includeDescription = (bool) IncludeDescription;
+            if (_diagnostics)
+                LogEvent(LogEventLevel.Debug, "Include Description in Log Message: '{IncludeDescription}' ...",
+                    _includeDescription);
+
             if (_diagnostics) LogEvent(LogEventLevel.Debug, "Convert Tags '{Tags}' to array ...", Tags);
 
             _tags = (Tags ?? "")
@@ -534,7 +581,62 @@ namespace Seq.App.EventThreshold
                 _priority = Priority;
 
             if (!string.IsNullOrEmpty(Responders))
-                _responders = Responders;
+            {
+                if (Responders.Contains('='))
+                {
+                    LogEvent(LogEventLevel.Debug, "Convert Responders to dictionary ...");
+                    var responderList = (Responders ?? "")
+                        .Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(t => t.Trim())
+                        .ToList();
+                    foreach (var x in from responder in responderList
+                        where responder.Contains("=")
+                        select responder.Split('='))
+                    {
+                        ResponderLookup.Add(x[0], x[1]);
+                        if (_diagnostics)
+                            LogEvent(LogEventLevel.Debug, "Add mapping for {LogToken} to {Responder}", x[0], x[1]);
+                    }
+                }
+                else
+                {
+                    _responders = Responders;
+                    if (_diagnostics)
+                        LogEvent(LogEventLevel.Debug, "Set responder to {Responder}", _responders);
+                }
+            }
+
+            if (!string.IsNullOrEmpty(ProjectKey))
+            {
+                if (_diagnostics)
+                    LogEvent(LogEventLevel.Debug, "Set Project Key to {Value}", ProjectKey);
+                _projectKey = ProjectKey;
+            }
+
+            if (!string.IsNullOrEmpty(InitialTimeEstimate) && DateTokens.ValidDateExpression(InitialTimeEstimate))
+            {
+                if (_diagnostics)
+                    LogEvent(LogEventLevel.Debug, "Set Initial Time Estimate to {Value}",
+                        DateTokens.SetValidExpression(InitialTimeEstimate));
+                _initialTimeEstimate = DateTokens.SetValidExpression(InitialTimeEstimate);
+            }
+
+            if (!string.IsNullOrEmpty(RemainingTimeEstimate) && DateTokens.ValidDateExpression(RemainingTimeEstimate))
+            {
+                if (_diagnostics)
+                    LogEvent(LogEventLevel.Debug, "Set Remaining Time Estimate to {Value}",
+                        DateTokens.SetValidExpression(RemainingTimeEstimate));
+                _remainingTimeEstimate = DateTokens.SetValidExpression(RemainingTimeEstimate);
+            }
+
+            if (!string.IsNullOrEmpty(DueDate) &&
+                (DateTokens.ValidDateExpression(DueDate) || DateTokens.ValidDate(DueDate)))
+            {
+                if (_diagnostics)
+                    LogEvent(LogEventLevel.Debug, "Set Due Date to {Value}",
+                        DateTokens.ValidDate(DueDate) ? DueDate : DateTokens.SetValidExpression(DueDate));
+                _dueDate = DateTokens.ValidDate(DueDate) ? DueDate : DateTokens.SetValidExpression(DueDate);
+            }
 
             if (_diagnostics)
                 LogEvent(LogEventLevel.Debug,
@@ -568,16 +670,16 @@ namespace Seq.App.EventThreshold
                 timeNow < _endTime)
             {
                 if (!IsShowtime && (!_daysOfWeek.Contains(_startTime.DayOfWeek) ||
-                                    _includeDays.Count > 0 && !_includeDays.Contains(_startTime.Day) ||
-                                    _excludeDays.Contains(_startTime.Day)))
+                                    IncludeDays.Count > 0 && !IncludeDays.Contains(_startTime) ||
+                                    ExcludeDays.Contains(_startTime)))
                 {
                     //Log that we have skipped a day due to an exclusion
                     if (!_skippedShowtime)
                         LogEvent(LogEventLevel.Debug,
                             "Threshold checking will not be performed due to exclusions - Day of Week Excluded {DayOfWeek}, Day Of Month Not Included {IncludeDay}, Day of Month Excluded {ExcludeDay} ...",
                             !_daysOfWeek.Contains(_startTime.DayOfWeek),
-                            _includeDays.Count > 0 && !_includeDays.Contains(_startTime.Day),
-                            _excludeDays.Count > 0 && _excludeDays.Contains(_startTime.Day));
+                            IncludeDays.Count > 0 && !IncludeDays.Contains(_startTime),
+                            ExcludeDays.Count > 0 && ExcludeDays.Contains(_startTime));
 
                     _skippedShowtime = true;
                 }
@@ -606,12 +708,14 @@ namespace Seq.App.EventThreshold
                             if (IsAlert && suppressDiff.TotalSeconds < _suppressionTime.TotalSeconds) return;
 
                             //Log event
-                                LogEvent(_thresholdLogLevel,
-                                    string.IsNullOrEmpty(_alertDescription) ? "{Message}" : "{Message} : {Description}",
-                                    _alertMessage, _alertDescription);
+                            var message = DateTokens.HandleTokens(_alertMessage);
+                            var description = DateTokens.HandleTokens(_alertDescription);
 
-                                _lastLog = timeNow;
-                                IsAlert = true;
+                            //Log event
+                            ScheduledLogEvent(_thresholdLogLevel, message, description);
+
+                            _lastLog = timeNow;
+                            IsAlert = true;
                         }
                         else
                         {
@@ -649,15 +753,15 @@ namespace Seq.App.EventThreshold
                 !string.IsNullOrEmpty(_testDate)) return;
             UtcRollover(timeNow);
             //Take the opportunity to refresh include/exclude days to allow for month rollover
-            _includeDays = Dates.GetDaysOfMonth(IncludeDaysOfMonth, StartTime, _startFormat);
-            if (_includeDays.Count > 0)
+            IncludeDays = Dates.GetUtcDaysOfMonth(IncludeDaysOfMonth, StartTime, _startFormat, DateTime.Now);
+            if (IncludeDays.Count > 0)
                 LogEvent(LogEventLevel.Debug, "Include UTC Days of Month: {includedays} ...",
-                    _includeDays.ToArray());
+                    IncludeDays.ToArray());
 
-            _excludeDays = Dates.GetDaysOfMonth(ExcludeDaysOfMonth, StartTime, _startFormat);
-            if (_excludeDays.Count > 0)
+            ExcludeDays = Dates.GetUtcDaysOfMonth(ExcludeDaysOfMonth, StartTime, _startFormat, DateTime.Now);
+            if (ExcludeDays.Count > 0)
                 LogEvent(LogEventLevel.Debug, "Exclude UTC Days of Month: {excludedays} ...",
-                    _excludeDays.ToArray());
+                    ExcludeDays.ToArray());
         }
 
         /// <summary>
@@ -728,7 +832,7 @@ namespace Seq.App.EventThreshold
                 {
                     if (_diagnostics) LogEvent(LogEventLevel.Debug, "Validate Country {Country}", Country);
 
-                    if (Classes.Holidays.ValidateCountry(Country))
+                    if (Lurgle.Dates.Holidays.ValidateCountry(Country))
                     {
                         _useHolidays = true;
                         _retryCount = 10;
@@ -769,7 +873,7 @@ namespace Seq.App.EventThreshold
                                 _useProxy, _proxy, _bypassLocal,
                                 !string.IsNullOrEmpty(ProxyUser) && !string.IsNullOrEmpty(ProxyPass));
 
-                        WebClient.SetFlurlConfig(App.Title, _useProxy, _proxy, _proxyUser, _proxyPass, _bypassLocal,
+                        WebClient.SetConfig(App.Title, _useProxy, _proxy, _proxyUser, _proxyPass, _bypassLocal,
                             _localAddresses);
                     }
                     else
@@ -825,7 +929,7 @@ namespace Seq.App.EventThreshold
                 {
                     _lastUpdate = DateTime.Now;
                     var result = WebClient.GetHolidays(_apiKey, _country, localDate).Result;
-                    Holidays = Classes.Holidays.ValidateHolidays(result, _holidayMatch, _localeMatch, _includeBank,
+                    Holidays = Lurgle.Dates.Holidays.ValidateHolidays(result, _holidayMatch, _localeMatch, _includeBank,
                         _includeWeekends);
                     _lastDay = localDate;
                     _errorCount = 0;
@@ -946,6 +1050,62 @@ namespace Seq.App.EventThreshold
         public Showtime GetShowtime()
         {
             return new Showtime(_startTime, _endTime);
+        }
+
+        /// <summary>
+        ///     Output a scheduled log event that always defines the Message and Description tags for use with other apps
+        /// </summary>
+        /// <param name="logLevel"></param>
+        /// <param name="message"></param>
+        /// <param name="description"></param>
+        /// <param name="token"></param>
+        private void ScheduledLogEvent(LogEventLevel logLevel, string message, string description,
+            KeyValuePair<string, string>? token = null)
+        {
+            if (_includeApp) message = "[{AppName}] -" + message;
+
+            var responder = string.Empty;
+            if (ResponderLookup.Count > 0)
+            {
+                if (token != null)
+                    foreach (var responderPair in from responderPair in ResponderLookup
+                        let tokenPair = (KeyValuePair<string, string>) token
+                        where responderPair.Key.Equals(tokenPair.Key, StringComparison.OrdinalIgnoreCase)
+                        select responderPair)
+                    {
+                        responder = responderPair.Value;
+                        break;
+                    }
+            }
+            else
+            {
+                responder = _responders;
+            }
+
+
+            if (_isTags)
+                Log.ForContext(nameof(Tags), DateTokens.HandleTokens(_tags, token)).ForContext("AppName", App.Title)
+                    .ForContext(nameof(Priority), _priority).ForContext(nameof(Responders), responder)
+                    .ForContext(nameof(InitialTimeEstimate), _initialTimeEstimate)
+                    .ForContext(nameof(RemainingTimeEstimate), _remainingTimeEstimate)
+                    .ForContext(nameof(ProjectKey), _projectKey).ForContext(nameof(DueDate), _dueDate)
+                    .ForContext(nameof(EventCount), EventCount).ForContext("Message", message)
+                    .ForContext("Description", description)
+                    .Write((Serilog.Events.LogEventLevel) logLevel,
+                        string.IsNullOrEmpty(description) || !_includeDescription
+                            ? "{Message}"
+                            : "{Message} : {Description}");
+            else
+                Log.ForContext("AppName", App.Title).ForContext(nameof(Priority), _priority)
+                    .ForContext(nameof(Responders), responder).ForContext(nameof(EventCount), EventCount)
+                    .ForContext(nameof(InitialTimeEstimate), _initialTimeEstimate)
+                    .ForContext(nameof(RemainingTimeEstimate), _remainingTimeEstimate)
+                    .ForContext(nameof(ProjectKey), _projectKey).ForContext(nameof(DueDate), _dueDate)
+                    .ForContext("Message", message).ForContext("Description", description)
+                    .Write((Serilog.Events.LogEventLevel) logLevel,
+                        string.IsNullOrEmpty(description) || !_includeDescription
+                            ? "{Message}"
+                            : "{Message} : {Description}");
         }
 
         /// <summary>
