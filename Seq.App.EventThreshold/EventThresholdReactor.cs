@@ -1063,7 +1063,7 @@ namespace Seq.App.EventThreshold
         private void ScheduledLogEvent(LogEventLevel logLevel, string message, string description,
             KeyValuePair<string, string>? token = null)
         {
-            string include = "{AppName} - ";
+            var include = "{AppName} - ";
             if (!_includeApp) include = string.Empty;
 
             var responder = string.Empty;
@@ -1118,9 +1118,14 @@ namespace Seq.App.EventThreshold
         /// <param name="args"></param>
         private void LogEvent(LogEventLevel logLevel, string message, params object[] args)
         {
-            string include = "{AppName} - ";
-            if (!_includeApp) include = string.Empty;
+            var logArgsList = args.ToList();
 
+            if (_includeApp)
+            {
+                logArgsList.Insert(0, App.Title);
+            }
+
+            var logArgs = logArgsList.ToArray();
 
             if (_isTags)
                 Log.ForContext(nameof(Tags), _tags).ForContext("AppName", App.Title)
@@ -1128,11 +1133,11 @@ namespace Seq.App.EventThreshold
                     .ForContext(nameof(EventCount), EventCount).ForContext(nameof(InitialTimeEstimate), _initialTimeEstimate)
                     .ForContext(nameof(RemainingTimeEstimate), _remainingTimeEstimate)
                     .ForContext(nameof(ProjectKey), _projectKey).ForContext(nameof(DueDate), _dueDate)
-                    .Write((Serilog.Events.LogEventLevel) logLevel, $"{include}{message}", args);
+                    .Write((Serilog.Events.LogEventLevel) logLevel, _includeApp ? "[{AppName}] - " + message : message, logArgs);
             else
                 Log.ForContext("AppName", App.Title).ForContext(nameof(Priority), _priority)
                     .ForContext(nameof(Responders), _responders).ForContext(nameof(EventCount), EventCount)
-                    .Write((Serilog.Events.LogEventLevel) logLevel, $"{include}{message}", args);
+                    .Write((Serilog.Events.LogEventLevel) logLevel, _includeApp ? "[{AppName}] - " + message : message, logArgs);
         }
 
         /// <summary>
@@ -1144,9 +1149,14 @@ namespace Seq.App.EventThreshold
         /// <param name="args"></param>
         private void LogEvent(LogEventLevel logLevel, Exception exception, string message, params object[] args)
         {
-            string include = "{AppName} - ";
-            if (!_includeApp) include = string.Empty;
+            var logArgsList = args.ToList();
 
+            if (_includeApp)
+            {
+                logArgsList.Insert(0, App.Title);
+            }
+
+            var logArgs = logArgsList.ToArray();
 
             if (_isTags)
                 Log.ForContext(nameof(Tags), _tags).ForContext("AppName", App.Title)
@@ -1154,14 +1164,14 @@ namespace Seq.App.EventThreshold
                     .ForContext(nameof(EventCount), EventCount).ForContext(nameof(InitialTimeEstimate), _initialTimeEstimate)
                     .ForContext(nameof(RemainingTimeEstimate), _remainingTimeEstimate)
                     .ForContext(nameof(ProjectKey), _projectKey).ForContext(nameof(DueDate), _dueDate)
-                    .Write((Serilog.Events.LogEventLevel) logLevel, exception, $"{include}{message}", args);
+                    .Write((Serilog.Events.LogEventLevel) logLevel, exception, _includeApp ? "[{AppName}] - " + message : message, logArgs);
             else
                 Log.ForContext("AppName", App.Title).ForContext(nameof(Priority), _priority)
                     .ForContext(nameof(Responders), _responders).ForContext(nameof(EventCount), EventCount)
                     .ForContext(nameof(InitialTimeEstimate), _initialTimeEstimate)
                     .ForContext(nameof(RemainingTimeEstimate), _remainingTimeEstimate)
                     .ForContext(nameof(ProjectKey), _projectKey).ForContext(nameof(DueDate), _dueDate)
-                    .Write((Serilog.Events.LogEventLevel) logLevel, exception, $"{include}{message}", args);
+                    .Write((Serilog.Events.LogEventLevel) logLevel, exception, _includeApp ? "[{AppName}] - " + message : message, logArgs);
         }
     }
 }
