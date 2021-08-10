@@ -167,7 +167,7 @@ namespace Seq.App.EventThreshold
         public string RemainingTimeEstimate { get; set; }
 
         [SeqAppSetting(DisplayName = "Due Date for scheduled logs",
-            HelpText = "Optional Due Date property to pass for scheduled logs, for use with other apps. Jira-type date expression, eg. Ww (weeks) Xd (days) Yh (hours) Zm (minutes).",
+            HelpText = "Optional Due Date property to pass for scheduled logs, for use with other apps. Date in yyyy-MM-dd format, or Jira-type date expression, eg. Ww (weeks) Xd (days) Yh (hours) Zm (minutes).",
             IsOptional = true)]
         public string DueDate { get; set; }
 
