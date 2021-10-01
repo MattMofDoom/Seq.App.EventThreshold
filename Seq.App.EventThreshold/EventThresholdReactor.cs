@@ -19,69 +19,13 @@ namespace Seq.App.EventThreshold
     // ReSharper disable once UnusedType.Global
     public class EventThresholdReactor : SeqApp, ISubscribeTo<LogEventData>
     {
-        private static readonly Dictionary<string, string> ResponderLookup = new Dictionary<string, string>();
-        private string _alertDescription;
-        private string _alertMessage;
-        private string _apiKey;
-        private bool _bypassLocal;
-        private bool _cannotMatchAlerted;
-        private string _country;
-        private List<DayOfWeek> _daysOfWeek;
-        private bool _diagnostics;
-        private string _dueDate;
-        private string _endFormat = "H:mm:ss";
-        private DateTime _endTime;
-        private int _errorCount;
-        private List<string> _holidayMatch;
-        private bool _includeApp;
-        private bool _includeBank;
-        private bool _includeDescription;
-        private bool _includeWeekends;
-        private string _initialTimeEstimate;
-        private bool _invertThreshold;
-
-        private bool _is24H;
-        private bool _isTags;
-        private bool _isUpdating;
-        private DateTime _lastCheck;
-        private DateTime _lastDay;
-        private DateTime _lastError;
-        private DateTime _lastLog;
-        private DateTime _lastUpdate;
-        private string[] _localAddresses;
-
-        private List<string> _localeMatch;
-        private bool _logEventCount;
-
-        private string _priority;
-        private string _projectKey;
-        private Dictionary<string, string> _properties;
-        private string _proxy;
-        private string _proxyPass;
-        private string _proxyUser;
-        private string _remainingTimeEstimate;
-        private string _responders;
-        private int _retryCount;
-        private bool _skippedShowtime;
-        private string _startFormat = "H:mm:ss";
-        private DateTime _startTime;
-        private TimeSpan _suppressionTime;
-        private string[] _tags;
-        private string _testDate;
-        private int _threshold;
-        private TimeSpan _thresholdInterval;
-        private LogEventLevel _thresholdLogLevel;
+        public readonly ThresholdConfig Config = new ThresholdConfig();
+        public readonly ThresholdCounters Counters = new ThresholdCounters();
         private Timer _timer;
-        private bool _useHolidays;
-        private bool _useProxy;
-        public int EventCount;
-        public List<DateTime> ExcludeDays;
-        public List<AbstractApiHolidays> Holidays;
-        public List<DateTime> IncludeDays;
-        public bool IsAlert;
-        public bool IsShowtime;
-        public DateTime TestOverrideTime = DateTime.Now;
-        public bool UseTestOverrideTime; // ReSharper disable MemberCanBePrivate.Global
+        public string Description;
+        public HandlebarsTemplate DescriptionTemplate;
+        public string Message;
+        public HandlebarsTemplate MessageTemplate;  // ReSharper disable MemberCanBePrivate.Global
 
         // ReSharper disable UnusedAutoPropertyAccessor.Global
         // ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
@@ -376,8 +320,8 @@ namespace Seq.App.EventThreshold
             var properties = 0;
             var matches = 0;
 
-            if (!IsShowtime) return;
-            foreach (var property in _properties)
+            if (!Counters.IsShowtime) return;
+            foreach (var property in Config.Properties)
             {
                 properties++;
                 if (property.Key.Equals("@Message", StringComparison.OrdinalIgnoreCase))
@@ -409,16 +353,16 @@ namespace Seq.App.EventThreshold
 
             switch (cannotMatch)
             {
-                case true when !_cannotMatchAlerted:
+                case true when !Counters.CannotMatchAlerted:
                     LogEvent(LogEventLevel.Debug,
                         "Warning - An event was seen without the properties {PropertyName}, which may impact the ability to alert on failures - further failures will not be logged ...",
                         string.Join(",", cannotMatchProperties.ToArray()));
-                    _cannotMatchAlerted = true;
+                    Counters.CannotMatchAlerted = true;
                     break;
                 //If all configured properties were present and had matches, log an event
                 case false when properties == matches:
                 {
-                    EventCount++;
+                    Counters.EventCount++;
                     break;
                 }
             }
@@ -428,16 +372,16 @@ namespace Seq.App.EventThreshold
         {
             LogEvent(LogEventLevel.Debug, "Check {AppName} diagnostic level ({Diagnostics}) ...", App.Title,
                 Diagnostics);
-            _diagnostics = Diagnostics;
+            Config.Diagnostics = Diagnostics;
 
-            if (_diagnostics)
+            if (Config.Diagnostics)
                 LogEvent(LogEventLevel.Debug, "Check include {AppName} ({IncludeApp}) ...", App.Title, IncludeApp);
 
-            _includeApp = IncludeApp;
-            if (!_includeApp && _diagnostics)
+            Config.IncludeApp = IncludeApp;
+            if (!Config.IncludeApp && Config.Diagnostics)
                 LogEvent(LogEventLevel.Debug, "App name {AppName} will not be included in alert message ...",
                     App.Title);
-            else if (_diagnostics)
+            else if (Config.Diagnostics)
                 LogEvent(LogEventLevel.Debug, "App name {AppName} will be included in alert message ...", App.Title);
 
             if (!DateTime.TryParseExact(StartTime, "H:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None,
@@ -445,7 +389,7 @@ namespace Seq.App.EventThreshold
             {
                 if (DateTime.TryParseExact(StartTime, "H:mm", CultureInfo.InvariantCulture, DateTimeStyles.None,
                     out _))
-                    _startFormat = "H:mm";
+                    Config.StartFormat = "H:mm";
                 else
                     LogEvent(LogEventLevel.Debug,
                         "Start Time {StartTime} does  not parse to a valid DateTime - app will exit ...", StartTime);
@@ -456,30 +400,30 @@ namespace Seq.App.EventThreshold
             {
                 if (DateTime.TryParseExact(EndTime, "H:mm", CultureInfo.InvariantCulture, DateTimeStyles.None,
                     out _))
-                    _endFormat = "H:mm";
+                    Config.EndFormat = "H:mm";
                 else
                     LogEvent(LogEventLevel.Debug,
                         "End Time {EndTime} does  not parse to a valid DateTime - app will exit ...", EndTime);
             }
 
-            _invertThreshold = InvertThreshold;
-            if (_diagnostics)
+            Config.InvertThreshold = InvertThreshold;
+            if (Config.Diagnostics)
                 LogEvent(LogEventLevel.Debug, "Invert threshold to Greater Than or Equal To (>=): {InvertThreshold}",
-                    _invertThreshold);
+                    Config.InvertThreshold);
 
             if (Threshold <= 0)
                 Threshold = 1;
-            _threshold = Threshold;
-            if (_diagnostics)
+            Config.Threshold = Threshold;
+            if (Config.Diagnostics)
                 LogEvent(LogEventLevel.Debug,
-                    _invertThreshold
+                    Config.InvertThreshold
                         ? "Threshold for events is 'Greater Than or Equal To {Threshold}' ..."
-                        : "Threshold for events is 'Less Than or Equal To {Threshold}' ...", _threshold);
+                        : "Threshold for events is 'Less Than or Equal To {Threshold}' ...", Config.Threshold);
 
 
-            _logEventCount = LogEventCount;
-            if (_diagnostics)
-                LogEvent(LogEventLevel.Debug, "Log events at end of each interval {LogEventCount}", _logEventCount);
+            Config.LogEventCount = LogEventCount;
+            if (Config.Diagnostics)
+                LogEvent(LogEventLevel.Debug, "Log events at end of each interval {LogEventCount}", Config.LogEventCount);
 
             LogEvent(LogEventLevel.Debug,
                 "Use Holidays API {UseHolidays}, Country {Country}, Has API key {IsEmpty} ...", UseHolidays, Country,
@@ -487,164 +431,150 @@ namespace Seq.App.EventThreshold
             SetHolidays();
             RetrieveHolidays(DateTime.Today, DateTime.UtcNow);
 
-            if (!_useHolidays || _isUpdating) UtcRollover(DateTime.UtcNow);
+            if (!Config.UseHolidays || Counters.IsUpdating) UtcRollover(DateTime.UtcNow);
 
             //Enforce minimum threshold interval
             if (ThresholdInterval <= 0)
                 ThresholdInterval = 1;
-            if (_diagnostics)
+            if (Config.Diagnostics)
                 LogEvent(LogEventLevel.Debug, "Convert Threshold Interval {ThresholdInterval} to TimeSpan ...",
                     ThresholdInterval);
 
-            _thresholdInterval = TimeSpan.FromSeconds(ThresholdInterval);
-            if (_diagnostics)
+            Config.ThresholdInterval = TimeSpan.FromSeconds(ThresholdInterval);
+            if (Config.Diagnostics)
                 LogEvent(LogEventLevel.Debug, "Parsed Threshold Interval is {Interval} ...",
-                    _thresholdInterval.TotalSeconds);
+                    Config.ThresholdInterval.TotalSeconds);
 
             //Negative values not permitted
             if (SuppressionTime < 0)
                 SuppressionTime = 0;
-            if (_diagnostics)
+            if (Config.Diagnostics)
                 LogEvent(LogEventLevel.Debug, "Convert Suppression {Suppression} to TimeSpan ...", SuppressionTime);
 
-            _suppressionTime = TimeSpan.FromSeconds(SuppressionTime);
-            if (_diagnostics)
-                LogEvent(LogEventLevel.Debug, "Parsed Suppression is {Suppression} ...", _suppressionTime.TotalSeconds);
+            Config.SuppressionTime = TimeSpan.FromSeconds(SuppressionTime);
+            if (Config.Diagnostics)
+                LogEvent(LogEventLevel.Debug, "Parsed Suppression is {Suppression} ...", Config.SuppressionTime.TotalSeconds);
 
-            if (_diagnostics)
+            if (Config.Diagnostics)
                 LogEvent(LogEventLevel.Debug, "Convert Days of Week {DaysOfWeek} to UTC Days of Week ...", DaysOfWeek);
-            _daysOfWeek = Dates.GetUtcDaysOfWeek(DaysOfWeek, StartTime, _startFormat);
+            Config.DaysOfWeek = Dates.GetUtcDaysOfWeek(DaysOfWeek, StartTime, Config.StartFormat);
 
-            if (_diagnostics)
-                LogEvent(LogEventLevel.Debug, "UTC Days of Week {DaysOfWeek} will be used ...", _daysOfWeek.ToArray());
+            if (Config.Diagnostics)
+                LogEvent(LogEventLevel.Debug, "UTC Days of Week {DaysOfWeek} will be used ...", Config.DaysOfWeek.ToArray());
 
-            if (_diagnostics)
-                LogEvent(LogEventLevel.Debug, "Validate Include Days of Month {IncludeDays} ...", IncludeDaysOfMonth);
+            if (Config.Diagnostics)
+                LogEvent(LogEventLevel.Debug, "Validate Include Days of Month {Config.IncludeDays} ...", IncludeDaysOfMonth);
 
-            IncludeDays = Dates.GetUtcDaysOfMonth(IncludeDaysOfMonth, StartTime, _startFormat, DateTime.Now);
-            if (IncludeDays.Count > 0)
-                LogEvent(LogEventLevel.Debug, "Include UTC Days of Month: {IncludeDays} ...", IncludeDays.ToArray());
+            Config.IncludeDays = Dates.GetUtcDaysOfMonth(IncludeDaysOfMonth, StartTime, Config.StartFormat, DateTime.Now);
+            if (Config.IncludeDays.Count > 0)
+                LogEvent(LogEventLevel.Debug, "Include UTC Days of Month: {Config.IncludeDays} ...", Config.IncludeDays.ToArray());
             else
                 LogEvent(LogEventLevel.Debug, "Include UTC Days of Month: ALL ...");
 
-            if (_diagnostics)
-                LogEvent(LogEventLevel.Debug, "Validate Exclude Days of Month {ExcludeDays} ...", ExcludeDaysOfMonth);
+            if (Config.Diagnostics)
+                LogEvent(LogEventLevel.Debug, "Validate Exclude Days of Month {Config.ExcludeDays} ...", ExcludeDaysOfMonth);
 
-            ExcludeDays = Dates.GetUtcDaysOfMonth(ExcludeDaysOfMonth, StartTime, _startFormat, DateTime.Now);
-            if (ExcludeDays.Count > 0)
-                LogEvent(LogEventLevel.Debug, "Exclude UTC Days of Month: {ExcludeDays} ...", ExcludeDays.ToArray());
+            Config.ExcludeDays = Dates.GetUtcDaysOfMonth(ExcludeDaysOfMonth, StartTime, Config.StartFormat, DateTime.Now);
+            if (Config.ExcludeDays.Count > 0)
+                LogEvent(LogEventLevel.Debug, "Exclude UTC Days of Month: {Config.ExcludeDays} ...", Config.ExcludeDays.ToArray());
             else
                 LogEvent(LogEventLevel.Debug, "Exclude UTC Days of Month: NONE ...");
 
             //Evaluate the properties we will match
-            _properties = SetProperties();
-            if (_diagnostics)
+            Config.Properties = SetProperties();
+            if (Config.Diagnostics)
                 LogEvent(LogEventLevel.Debug, "Match criteria will be: {MatchText}",
-                    PropertyMatch.MatchConditions(_properties));
+                    PropertyMatch.MatchConditions(Config.Properties));
 
-            if (_diagnostics)
+            if (Config.Diagnostics)
                 LogEvent(LogEventLevel.Debug, "Validate Alert Message '{AlertMessage}' ...", AlertMessage);
 
-            _alertMessage = string.IsNullOrWhiteSpace(AlertMessage)
-                ? "A threshold violation has occurred!"
-                : AlertMessage.Trim();
-            if (_diagnostics)
-                LogEvent(LogEventLevel.Debug, "Alert Message '{AlertMessage}' will be used ...", _alertMessage);
+            Message = !string.IsNullOrWhiteSpace(AlertMessage)
+                ? AlertMessage.Trim()
+                : "A threshold violation has occurred!";
+            MessageTemplate = Config.UseHandlebars ? new HandlebarsTemplate(Message) : new HandlebarsTemplate("");
 
-            if (_diagnostics)
+            if (Config.Diagnostics)
+                LogEvent(LogEventLevel.Debug, "Alert Message '{AlertMessage}' will be used ...", Message);
+
+            if (Config.Diagnostics)
                 LogEvent(LogEventLevel.Debug, "Validate Alert Description '{AlertDescription}' ...", AlertDescription);
 
-            _alertDescription = string.IsNullOrWhiteSpace(AlertDescription)
-                ? ""
-                : AlertDescription.Trim();
-            if (_diagnostics)
+            Description = !string.IsNullOrWhiteSpace(AlertDescription)
+                ? AlertDescription.Trim()
+                : "";
+            DescriptionTemplate =
+                Config.UseHandlebars ? new HandlebarsTemplate(Description) : new HandlebarsTemplate("");
+
+            if (Config.Diagnostics)
                 LogEvent(LogEventLevel.Debug, "Alert Description '{AlertDescription}' will be used ...",
-                    _alertDescription);
+                    Description);
 
             if (IncludeDescription != null)
-                _includeDescription = (bool) IncludeDescription;
-            if (_diagnostics)
+                Config.IncludeDescription = (bool) IncludeDescription;
+            if (Config.Diagnostics)
                 LogEvent(LogEventLevel.Debug, "Include Description in Log Message: '{IncludeDescription}' ...",
-                    _includeDescription);
+                    Config.IncludeDescription);
 
-            if (_diagnostics) LogEvent(LogEventLevel.Debug, "Convert Tags '{Tags}' to array ...", Tags);
+            if (Config.Diagnostics) LogEvent(LogEventLevel.Debug, "Convert Tags '{Tags}' to array ...", Tags);
 
-            _tags = (Tags ?? "")
+            Config.Tags = (Tags ?? "")
                 .Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries)
                 .Select(t => t.Trim())
                 .ToArray();
-            if (_tags.Length > 0) _isTags = true;
+            if (Config.Tags.Length > 0) Config.IsTags = true;
 
             if (string.IsNullOrWhiteSpace(ThresholdLogLevel)) ThresholdLogLevel = "Error";
-            if (!Enum.TryParse(ThresholdLogLevel, out _thresholdLogLevel)) _thresholdLogLevel = LogEventLevel.Error;
+            if (!Enum.TryParse(ThresholdLogLevel, out Config.ThresholdLogLevel)) Config.ThresholdLogLevel = LogEventLevel.Error;
 
             if (!string.IsNullOrEmpty(Priority))
-                _priority = Priority;
+                Config.Priority = Priority;
 
             if (!string.IsNullOrEmpty(Responders))
             {
-                if (Responders.Contains('='))
-                {
-                    LogEvent(LogEventLevel.Debug, "Convert Responders to dictionary ...");
-                    var responderList = (Responders ?? "")
-                        .Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries)
-                        .Select(t => t.Trim())
-                        .ToList();
-                    foreach (var x in from responder in responderList
-                        where responder.Contains("=")
-                        select responder.Split('='))
-                    {
-                        ResponderLookup.Add(x[0], x[1]);
-                        if (_diagnostics)
-                            LogEvent(LogEventLevel.Debug, "Add mapping for {LogToken} to {Responder}", x[0], x[1]);
-                    }
-                }
-                else
-                {
-                    _responders = Responders;
-                    if (_diagnostics)
-                        LogEvent(LogEventLevel.Debug, "Set responder to {Responder}", _responders);
-                }
+                Config.Responders = Responders;
+                if (Config.Diagnostics)
+                    LogEvent(LogEventLevel.Debug, "Set responder to {Responder}", Config.Responders);
             }
 
             if (!string.IsNullOrEmpty(ProjectKey))
             {
-                if (_diagnostics)
+                if (Config.Diagnostics)
                     LogEvent(LogEventLevel.Debug, "Set Project Key to {Value}", ProjectKey);
-                _projectKey = ProjectKey;
+                Config.ProjectKey = ProjectKey;
             }
 
             if (!string.IsNullOrEmpty(InitialTimeEstimate) && DateTokens.ValidDateExpression(InitialTimeEstimate))
             {
-                if (_diagnostics)
+                if (Config.Diagnostics)
                     LogEvent(LogEventLevel.Debug, "Set Initial Time Estimate to {Value}",
                         DateTokens.SetValidExpression(InitialTimeEstimate));
-                _initialTimeEstimate = DateTokens.SetValidExpression(InitialTimeEstimate);
+                Config.InitialTimeEstimate = DateTokens.SetValidExpression(InitialTimeEstimate);
             }
 
             if (!string.IsNullOrEmpty(RemainingTimeEstimate) && DateTokens.ValidDateExpression(RemainingTimeEstimate))
             {
-                if (_diagnostics)
+                if (Config.Diagnostics)
                     LogEvent(LogEventLevel.Debug, "Set Remaining Time Estimate to {Value}",
                         DateTokens.SetValidExpression(RemainingTimeEstimate));
-                _remainingTimeEstimate = DateTokens.SetValidExpression(RemainingTimeEstimate);
+                Config.RemainingTimeEstimate = DateTokens.SetValidExpression(RemainingTimeEstimate);
             }
 
             if (!string.IsNullOrEmpty(DueDate) &&
                 (DateTokens.ValidDateExpression(DueDate) || DateTokens.ValidDate(DueDate)))
             {
-                if (_diagnostics)
+                if (Config.Diagnostics)
                     LogEvent(LogEventLevel.Debug, "Set Due Date to {Value}",
                         DateTokens.ValidDate(DueDate) ? DueDate : DateTokens.SetValidExpression(DueDate));
-                _dueDate = DateTokens.ValidDate(DueDate) ? DueDate : DateTokens.SetValidExpression(DueDate);
+                Config.DueDate = DateTokens.ValidDate(DueDate) ? DueDate : DateTokens.SetValidExpression(DueDate);
             }
 
-            if (_diagnostics)
+            if (Config.Diagnostics)
                 LogEvent(LogEventLevel.Debug,
                     "Log level {LogLevel} will be used for threshold violations on {Instance} ...",
-                    _thresholdLogLevel, App.Title);
+                    Config.ThresholdLogLevel, App.Title);
 
-            if (_diagnostics) LogEvent(LogEventLevel.Debug, "Starting timer ...");
+            if (Config.Diagnostics) LogEvent(LogEventLevel.Debug, "Starting timer ...");
 
             _timer = new Timer(1000)
             {
@@ -652,7 +582,7 @@ namespace Seq.App.EventThreshold
             };
             _timer.Elapsed += TimerOnElapsed;
             _timer.Start();
-            if (_diagnostics) LogEvent(LogEventLevel.Debug, "Timer started ...");
+            if (Config.Diagnostics) LogEvent(LogEventLevel.Debug, "Timer started ...");
         }
 
 
@@ -660,109 +590,107 @@ namespace Seq.App.EventThreshold
         {
             var timeNow = DateTime.UtcNow;
             var localDate = DateTime.Today;
-            if (!string.IsNullOrEmpty(_testDate))
-                localDate = DateTime.ParseExact(_testDate, "yyyy-M-d", CultureInfo.InvariantCulture,
+            if (!string.IsNullOrEmpty(Config.TestDate))
+                localDate = DateTime.ParseExact(Config.TestDate, "yyyy-M-d", CultureInfo.InvariantCulture,
                     DateTimeStyles.None);
 
-            if (_lastDay < localDate) RetrieveHolidays(localDate, timeNow);
+            if (Counters.LastDay < localDate) RetrieveHolidays(localDate, timeNow);
 
             //We can only enter showtime if we're not currently retrying holidays, but existing showtimes will continue to monitor
-            if ((!_useHolidays || IsShowtime || !IsShowtime && !_isUpdating) && timeNow >= _startTime &&
-                timeNow < _endTime)
+            if ((!Config.UseHolidays || Counters.IsShowtime || !Counters.IsShowtime && !Counters.IsUpdating) && timeNow >= Counters.StartTime &&
+                timeNow < Counters.EndTime)
             {
-                if (!IsShowtime && (!_daysOfWeek.Contains(_startTime.DayOfWeek) ||
-                                    IncludeDays.Count > 0 && !IncludeDays.Contains(_startTime) ||
-                                    ExcludeDays.Contains(_startTime)))
+                if (!Counters.IsShowtime && (!Config.DaysOfWeek.Contains(Counters.StartTime.DayOfWeek) ||
+                                    Config.IncludeDays.Count > 0 && !Config.IncludeDays.Contains(Counters.StartTime) ||
+                                    Config.ExcludeDays.Contains(Counters.StartTime)))
                 {
                     //Log that we have skipped a day due to an exclusion
-                    if (!_skippedShowtime)
+                    if (!Counters.SkippedShowtime)
                         LogEvent(LogEventLevel.Debug,
                             "Threshold checking will not be performed due to exclusions - Day of Week Excluded {DayOfWeek}, Day Of Month Not Included {IncludeDay}, Day of Month Excluded {ExcludeDay} ...",
-                            !_daysOfWeek.Contains(_startTime.DayOfWeek),
-                            IncludeDays.Count > 0 && !IncludeDays.Contains(_startTime),
-                            ExcludeDays.Count > 0 && ExcludeDays.Contains(_startTime));
+                            !Config.DaysOfWeek.Contains(Counters.StartTime.DayOfWeek),
+                            Config.IncludeDays.Count > 0 && !Config.IncludeDays.Contains(Counters.StartTime),
+                            Config.ExcludeDays.Count > 0 && Config.ExcludeDays.Contains(Counters.StartTime));
 
-                    _skippedShowtime = true;
+                    Counters.SkippedShowtime = true;
                 }
                 else
                 {
                     //Showtime! - Count matched properties in log events
-                    if (!IsShowtime)
+                    if (!Counters.IsShowtime)
                     {
                         LogEvent(LogEventLevel.Debug,
                             "UTC Start Time {Time} ({DayOfWeek}), monitoring for {MatchText} over {Threshold} seconds, until UTC End time {EndTime} ({EndDayOfWeek}) ...",
-                            _startTime.ToShortTimeString(), _startTime.DayOfWeek,
-                            PropertyMatch.MatchConditions(_properties), _thresholdInterval.TotalSeconds,
-                            _endTime.ToShortTimeString(), _endTime.DayOfWeek);
-                        IsShowtime = true;
-                        _lastCheck = timeNow;
+                            Counters.StartTime.ToShortTimeString(), Counters.StartTime.DayOfWeek,
+                            PropertyMatch.MatchConditions(Config.Properties), Config.ThresholdInterval.TotalSeconds,
+                            Counters.EndTime.ToShortTimeString(), Counters.EndTime.DayOfWeek);
+                        Counters.IsShowtime = true;
+                        Counters.LastCheck = timeNow;
                     }
 
-                    var difference = timeNow - _lastCheck;
+                    var difference = timeNow - Counters.LastCheck;
                     //Check the interval time versus threshold count
-                    if (difference.TotalSeconds > _thresholdInterval.TotalSeconds)
+                    if (difference.TotalSeconds > Config.ThresholdInterval.TotalSeconds)
                     {
-                        if (InvertThreshold && EventCount >= _threshold ||
-                            !InvertThreshold && EventCount < _threshold)
+                        if (InvertThreshold && Counters.EventCount >= Config.Threshold ||
+                            !InvertThreshold && Counters.EventCount < Config.Threshold)
                         {
-                            var suppressDiff = timeNow - _lastLog;
-                            if (IsAlert && suppressDiff.TotalSeconds < _suppressionTime.TotalSeconds) return;
+                            var suppressDiff = timeNow - Counters.LastLog;
+                            if (Counters.IsAlert && suppressDiff.TotalSeconds < Config.SuppressionTime.TotalSeconds) return;
 
                             //Log event
-                            var message = DateTokens.HandleTokens(_alertMessage);
-                            var description = DateTokens.HandleTokens(_alertDescription);
+                            LogThresholdEvent(Config.ThresholdLogLevel,
+                                Config.UseHandlebars ? MessageTemplate.Render(Config, Counters) : Message,
+                                Config.UseHandlebars ? DescriptionTemplate.Render(Config, Counters) : Description);
 
-                            //Log event
-                            ScheduledLogEvent(_thresholdLogLevel, message, description);
-
-                            _lastLog = timeNow;
-                            IsAlert = true;
+                            Counters.LastLog = timeNow;
+                            Counters.IsAlert = true;
                         }
                         else
                         {
-                            IsAlert = false;
+                            Counters.IsAlert = false;
                         }
 
-                        if (_logEventCount)
-                            LogEvent(LogEventLevel.Debug, "Event count after {ThresholdInterval} seconds: {EventCount}",
-                                _thresholdInterval.TotalSeconds, EventCount);
+                        if (Config.LogEventCount)
+                            LogEvent(LogEventLevel.Debug, "Event count after {ThresholdInterval} seconds: {Counters.EventCount}",
+                                Config.ThresholdInterval.TotalSeconds, Counters.EventCount);
 
                         //Reset the threshold counter
-                        _lastCheck = timeNow;
-                        EventCount = 0;
+                        Counters.LastCheck = timeNow;
+                        Counters.EventCount = 0;
                     }
                 }
             }
-            else if (timeNow < _startTime || timeNow >= _endTime)
+            else if (timeNow < Counters.StartTime || timeNow >= Counters.EndTime)
             {
                 //Showtime can end even if we're retrieving holidays
-                if (IsShowtime)
+                if (Counters.IsShowtime)
                     LogEvent(LogEventLevel.Debug,
                         "UTC End Time {Time} ({DayOfWeek}), no longer monitoring for {MatchText}  ...",
-                        _endTime.ToShortTimeString(), _endTime.DayOfWeek, PropertyMatch.MatchConditions(_properties));
+                        Counters.EndTime.ToShortTimeString(), Counters.EndTime.DayOfWeek, PropertyMatch.MatchConditions(Config.Properties));
 
                 //Reset the match counters
-                _lastLog = timeNow;
-                _lastCheck = timeNow;
-                IsShowtime = false;
-                _cannotMatchAlerted = false;
-                _skippedShowtime = false;
+                Counters.LastLog = timeNow;
+                Counters.LastCheck = timeNow;
+                Counters.IsShowtime = false;
+                Counters.CannotMatchAlerted = false;
+                Counters.SkippedShowtime = false;
             }
 
             //We can only do UTC rollover if we're not currently retrying holidays and it's not during showtime
-            if (IsShowtime || _useHolidays && _isUpdating || _startTime > timeNow ||
-                !string.IsNullOrEmpty(_testDate)) return;
+            if (Counters.IsShowtime || Config.UseHolidays && Counters.IsUpdating || Counters.StartTime > timeNow ||
+                !string.IsNullOrEmpty(Config.TestDate)) return;
             UtcRollover(timeNow);
             //Take the opportunity to refresh include/exclude days to allow for month rollover
-            IncludeDays = Dates.GetUtcDaysOfMonth(IncludeDaysOfMonth, StartTime, _startFormat, DateTime.Now);
-            if (IncludeDays.Count > 0)
-                LogEvent(LogEventLevel.Debug, "Include UTC Days of Month: {includedays} ...",
-                    IncludeDays.ToArray());
+            Config.IncludeDays = Dates.GetUtcDaysOfMonth(IncludeDaysOfMonth, StartTime, Config.StartFormat, DateTime.Now);
+            if (Config.IncludeDays.Count > 0)
+                LogEvent(LogEventLevel.Debug, "Include UTC Days of Month: {Config.IncludeDays} ...",
+                    Config.IncludeDays.ToArray());
 
-            ExcludeDays = Dates.GetUtcDaysOfMonth(ExcludeDaysOfMonth, StartTime, _startFormat, DateTime.Now);
-            if (ExcludeDays.Count > 0)
-                LogEvent(LogEventLevel.Debug, "Exclude UTC Days of Month: {excludedays} ...",
-                    ExcludeDays.ToArray());
+            Config.ExcludeDays = Dates.GetUtcDaysOfMonth(ExcludeDaysOfMonth, StartTime, Config.StartFormat, DateTime.Now);
+            if (Config.ExcludeDays.Count > 0)
+                LogEvent(LogEventLevel.Debug, "Exclude UTC Days of Month: {Config.ExcludeDays} ...",
+                    Config.ExcludeDays.ToArray());
         }
 
         /// <summary>
@@ -797,13 +725,13 @@ namespace Seq.App.EventThreshold
         /// <returns></returns>
         private KeyValuePair<string, string> GetProperty(int property, string propertyName, string propertyMatch)
         {
-            if (_diagnostics)
+            if (Config.Diagnostics)
                 LogEvent(LogEventLevel.Debug, "Validate Property {PropertyNo}: '{PropertyNameValue}' ...", property,
                     propertyName);
 
             var propertyResult = PropertyMatch.GetProperty(property, propertyName, propertyMatch);
 
-            if (!string.IsNullOrEmpty(propertyResult.Key) && _diagnostics)
+            if (!string.IsNullOrEmpty(propertyResult.Key) && Config.Diagnostics)
             {
                 if (!string.IsNullOrEmpty(propertyMatch))
                     LogEvent(LogEventLevel.Debug,
@@ -814,7 +742,7 @@ namespace Seq.App.EventThreshold
                         "Property {PropertyNo} '{PropertyName}' will be used to match ANY text ...", property,
                         propertyResult.Key);
             }
-            else if (_diagnostics)
+            else if (Config.Diagnostics)
             {
                 LogEvent(LogEventLevel.Debug, "Property {PropertyNo} will not be used to match values ...", property);
             }
@@ -831,75 +759,75 @@ namespace Seq.App.EventThreshold
             {
                 case true when !string.IsNullOrEmpty(Country) && !string.IsNullOrEmpty(ApiKey):
                 {
-                    if (_diagnostics) LogEvent(LogEventLevel.Debug, "Validate Country {Country}", Country);
+                    if (Config.Diagnostics) LogEvent(LogEventLevel.Debug, "Validate Country {Country}", Country);
 
                     if (Lurgle.Dates.Holidays.ValidateCountry(Country))
                     {
-                        _useHolidays = true;
-                        _retryCount = 10;
+                        Config.UseHolidays = true;
+                        Counters.RetryCount = 10;
                         if (RetryCount >= 0 && RetryCount <= 100)
-                            _retryCount = RetryCount;
-                        _country = Country;
-                        _apiKey = ApiKey;
-                        _includeWeekends = IncludeWeekends;
-                        _includeBank = IncludeBank;
+                            Counters.RetryCount = RetryCount;
+                        Config.Country = Country;
+                        Config.ApiKey = ApiKey;
+                        Config.IncludeWeekends = IncludeWeekends;
+                        Config.IncludeBank = IncludeBank;
 
                         if (string.IsNullOrEmpty(HolidayMatch))
-                            _holidayMatch = new List<string>();
+                            Config.HolidayMatch = new List<string>();
                         else
-                            _holidayMatch = HolidayMatch.Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries)
+                            Config.HolidayMatch = HolidayMatch.Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries)
                                 .Select(t => t.Trim()).ToList();
 
                         if (string.IsNullOrEmpty(LocaleMatch))
-                            _localeMatch = new List<string>();
+                            Config.LocaleMatch = new List<string>();
                         else
-                            _localeMatch = LocaleMatch.Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries)
+                            Config.LocaleMatch = LocaleMatch.Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries)
                                 .Select(t => t.Trim()).ToList();
 
                         if (!string.IsNullOrEmpty(Proxy))
                         {
-                            _useProxy = true;
-                            _proxy = Proxy;
-                            _bypassLocal = BypassLocal;
-                            _localAddresses = LocalAddresses.Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries)
+                            Config.UseProxy = true;
+                            Config.Proxy = Proxy;
+                            Config.BypassLocal = BypassLocal;
+                            Config.LocalAddresses = LocalAddresses.Split(new[] {','}, StringSplitOptions.RemoveEmptyEntries)
                                 .Select(t => t.Trim()).ToArray();
-                            _proxyUser = ProxyUser;
-                            _proxyPass = ProxyPass;
+                            Config.ProxyUser = ProxyUser;
+                            Config.ProxyPass = ProxyPass;
                         }
 
-                        if (_diagnostics)
+                        if (Config.Diagnostics)
                             LogEvent(LogEventLevel.Debug,
                                 "Holidays API Enabled: {UseHolidays}, Country {Country}, Use Proxy {UseProxy}, Proxy Address {Proxy}, BypassLocal {BypassLocal}, Authentication {Authentication} ...",
-                                _useHolidays, _country,
-                                _useProxy, _proxy, _bypassLocal,
+                                Config.UseHolidays, Config.Country,
+                                Config.UseProxy, Config.Proxy, Config.BypassLocal,
                                 !string.IsNullOrEmpty(ProxyUser) && !string.IsNullOrEmpty(ProxyPass));
 
-                        WebClient.SetConfig(App.Title, _useProxy, _proxy, _proxyUser, _proxyPass, _bypassLocal,
-                            _localAddresses);
+                        WebClient.SetConfig(App.Title, Config.UseProxy, Config.Proxy, Config.ProxyUser, Config.ProxyPass, Config.BypassLocal,
+                            Config.LocalAddresses);
                     }
                     else
                     {
-                        _useHolidays = false;
+                        Config.UseHolidays = false;
                         LogEvent(LogEventLevel.Debug,
                             "Holidays API Enabled: {UseHolidays}, Could not parse country {CountryCode} to valid region ...",
-                            _useHolidays, _country);
+                            Config.UseHolidays, Config.Country);
                     }
 
                     break;
                 }
                 case true:
-                    _useHolidays = false;
+                    Config.UseHolidays = false;
                     LogEvent(LogEventLevel.Debug, "Holidays API Enabled: {UseHolidays}, One or more parameters not set",
-                        _useHolidays);
+                        Config.UseHolidays);
                     break;
             }
 
-            _lastDay = DateTime.Today.AddDays(-1);
-            _lastError = DateTime.Now.AddDays(-1);
-            _lastUpdate = DateTime.Now.AddDays(-1);
-            _errorCount = 0;
-            _testDate = TestDate;
-            Holidays = new List<AbstractApiHolidays>();
+            Counters.LastDay = DateTime.Today.AddDays(-1);
+            Counters.LastError = DateTime.Now.AddDays(-1);
+            Counters.LastUpdate = DateTime.Now.AddDays(-1);
+            Counters.ErrorCount = 0;
+            Config.TestDate = TestDate;
+            Config.Holidays = new List<AbstractApiHolidays>();
         }
 
         /// <summary>
@@ -909,36 +837,36 @@ namespace Seq.App.EventThreshold
         /// <param name="utcDate"></param>
         private void RetrieveHolidays(DateTime localDate, DateTime utcDate)
         {
-            if (_useHolidays && (!_isUpdating || _isUpdating && (DateTime.Now - _lastUpdate).TotalSeconds > 10 &&
-                (DateTime.Now - _lastError).TotalSeconds > 10 && _errorCount < _retryCount))
+            if (Config.UseHolidays && (!Counters.IsUpdating || Counters.IsUpdating && (DateTime.Now - Counters.LastUpdate).TotalSeconds > 10 &&
+                (DateTime.Now - Counters.LastError).TotalSeconds > 10 && Counters.ErrorCount < Counters.RetryCount))
             {
-                _isUpdating = true;
-                if (!string.IsNullOrEmpty(_testDate))
-                    localDate = DateTime.ParseExact(_testDate, "yyyy-M-d", CultureInfo.InvariantCulture,
+                Counters.IsUpdating = true;
+                if (!string.IsNullOrEmpty(Config.TestDate))
+                    localDate = DateTime.ParseExact(Config.TestDate, "yyyy-M-d", CultureInfo.InvariantCulture,
                         DateTimeStyles.None);
 
-                if (_diagnostics)
+                if (Config.Diagnostics)
                     LogEvent(LogEventLevel.Debug,
                         "Retrieve holidays for {Date}, Last Update {lastUpdateDate} {lastUpdateTime} ...",
-                        localDate.ToShortDateString(), _lastUpdate.ToShortDateString(),
-                        _lastUpdate.ToShortTimeString());
+                        localDate.ToShortDateString(), Counters.LastUpdate.ToShortDateString(),
+                        Counters.LastUpdate.ToShortTimeString());
 
-                var holidayUrl = WebClient.GetUrl(_apiKey, _country, localDate);
-                if (_diagnostics) LogEvent(LogEventLevel.Debug, "URL used is {url} ...", holidayUrl);
+                var holidayUrl = WebClient.GetUrl(Config.ApiKey, Config.Country, localDate);
+                if (Config.Diagnostics) LogEvent(LogEventLevel.Debug, "URL used is {url} ...", holidayUrl);
 
                 try
                 {
-                    _lastUpdate = DateTime.Now;
-                    var result = WebClient.GetHolidays(_apiKey, _country, localDate).Result;
-                    Holidays = Lurgle.Dates.Holidays.ValidateHolidays(result, _holidayMatch, _localeMatch, _includeBank,
-                        _includeWeekends);
-                    _lastDay = localDate;
-                    _errorCount = 0;
+                    Counters.LastUpdate = DateTime.Now;
+                    var result = WebClient.GetHolidays(Config.ApiKey, Config.Country, localDate).Result;
+                    Config.Holidays = Lurgle.Dates.Holidays.ValidateHolidays(result, Config.HolidayMatch, Config.LocaleMatch, Config.IncludeBank,
+                        Config.IncludeWeekends);
+                    Counters.LastDay = localDate;
+                    Counters.ErrorCount = 0;
 
-                    if (_diagnostics && !string.IsNullOrEmpty(_testDate))
+                    if (Config.Diagnostics && !string.IsNullOrEmpty(Config.TestDate))
                     {
                         LogEvent(LogEventLevel.Debug,
-                            "Test date {testDate} used, raw holidays retrieved {testCount} ...", _testDate,
+                            "Test date {testDate} used, raw holidays retrieved {testCount} ...", Config.TestDate,
                             result.Count);
                         foreach (var holiday in result)
                             LogEvent(LogEventLevel.Debug,
@@ -948,32 +876,32 @@ namespace Seq.App.EventThreshold
                     }
 
                     LogEvent(LogEventLevel.Debug, "Holidays retrieved and validated {holidayCount} ...",
-                        Holidays.Count);
-                    foreach (var holiday in Holidays)
+                        Config.Holidays.Count);
+                    foreach (var holiday in Config.Holidays)
                         LogEvent(LogEventLevel.Debug,
                             "Holiday Name: {Name}, Local Name {LocalName}, Start {LocalStart}, Start UTC {Start}, End UTC {End}, Type {Type}, Location string {Location}, Locations parsed {Locations} ...",
                             holiday.Name, holiday.Name_Local, holiday.LocalStart, holiday.UtcStart, holiday.UtcEnd,
                             holiday.Type, holiday.Location, holiday.Locations.ToArray());
 
-                    _isUpdating = false;
-                    if (!IsShowtime) UtcRollover(utcDate, true);
+                    Counters.IsUpdating = false;
+                    if (!Counters.IsShowtime) UtcRollover(utcDate, true);
                 }
                 catch (Exception ex)
                 {
-                    _errorCount++;
+                    Counters.ErrorCount++;
                     LogEvent(LogEventLevel.Debug, ex,
                         "Error {Error} retrieving holidays, public holidays cannot be evaluated (Try {Count} of {retryCount})...",
-                        ex.Message, _errorCount, _retryCount);
-                    _lastError = DateTime.Now;
+                        ex.Message, Counters.ErrorCount, Counters.RetryCount);
+                    Counters.LastError = DateTime.Now;
                 }
             }
-            else if (!_useHolidays || _isUpdating && _errorCount >= 10)
+            else if (!Config.UseHolidays || Counters.IsUpdating && Counters.ErrorCount >= 10)
             {
-                _isUpdating = false;
-                _lastDay = localDate;
-                _errorCount = 0;
-                Holidays = new List<AbstractApiHolidays>();
-                if (_useHolidays && !IsShowtime) UtcRollover(utcDate, true);
+                Counters.IsUpdating = false;
+                Counters.LastDay = localDate;
+                Counters.ErrorCount = 0;
+                Config.Holidays = new List<AbstractApiHolidays>();
+                if (Config.UseHolidays && !Counters.IsShowtime) UtcRollover(utcDate, true);
             }
         }
 
@@ -985,129 +913,110 @@ namespace Seq.App.EventThreshold
         public void UtcRollover(DateTime utcDate, bool isUpdateHolidays = false)
         {
             LogEvent(LogEventLevel.Debug, "UTC Time is currently {UtcTime} ...",
-                UseTestOverrideTime
-                    ? TestOverrideTime.ToUniversalTime().ToShortTimeString()
+                Config.UseTestOverrideTime
+                    ? Config.TestOverrideTime.ToUniversalTime().ToShortTimeString()
                     : DateTime.Now.ToUniversalTime().ToShortTimeString());
 
             //Day rollover, we need to ensure the next start and end is in the future
-            if (!string.IsNullOrEmpty(_testDate))
-                _startTime = DateTime.ParseExact(_testDate + " " + StartTime, "yyyy-M-d " + _startFormat,
-                    CultureInfo.InvariantCulture, DateTimeStyles.None).ToUniversalTime();
-            else if (UseTestOverrideTime)
-                _startTime = DateTime
-                    .ParseExact(TestOverrideTime.ToString("yyyy-M-d") + " " + StartTime, "yyyy-M-d " + _startFormat,
-                        CultureInfo.InvariantCulture, DateTimeStyles.None)
-                    .ToUniversalTime();
+            if (!string.IsNullOrEmpty(Config.TestDate))
+                Counters.StartTime =
+                    Dates.ParseUtcIntervalDate(Config.TestDate, StartTime, timeFormat: Config.StartFormat);
+            else if (Config.UseTestOverrideTime)
+                Counters.StartTime =
+                    Dates.ParseUtcIntervalDate(Config.TestOverrideTime, StartTime, timeFormat: Config.StartFormat);
             else
-                _startTime = DateTime
-                    .ParseExact(StartTime, _startFormat, CultureInfo.InvariantCulture, DateTimeStyles.None)
-                    .ToUniversalTime();
+                Counters.StartTime =
+                    Dates.ParseUtcIntervalDate(DateTime.Today, StartTime,
+                        timeFormat: Config.StartFormat);
 
-            if (!string.IsNullOrEmpty(_testDate))
-                _endTime = DateTime.ParseExact(_testDate + " " + EndTime, "yyyy-M-d " + _endFormat,
-                    CultureInfo.InvariantCulture, DateTimeStyles.None).ToUniversalTime();
-            else if (UseTestOverrideTime)
-                _endTime = DateTime.ParseExact(TestOverrideTime.ToString("yyyy-M-d") + " " + EndTime,
-                    "yyyy-M-d " + _endFormat,
-                    CultureInfo.InvariantCulture, DateTimeStyles.None).ToUniversalTime();
+            if (!string.IsNullOrEmpty(Config.TestDate))
+                Counters.EndTime = Dates.ParseUtcIntervalDate(Config.TestDate, EndTime, timeFormat: Config.EndFormat);
+            else if (Config.UseTestOverrideTime)
+                Counters.EndTime =
+                    Dates.ParseUtcIntervalDate(Config.TestOverrideTime, EndTime, timeFormat: Config.EndFormat);
             else
-                _endTime = DateTime.ParseExact(EndTime, _endFormat, CultureInfo.InvariantCulture, DateTimeStyles.None)
-                    .ToUniversalTime();
+                Counters.EndTime =
+                    Dates.ParseUtcIntervalDate(DateTime.Today, EndTime,
+                        timeFormat: Config.EndFormat);
 
             //Detect a 24  hour instance and handle it
-            if (_endTime == _startTime)
+            if (Counters.EndTime == Counters.StartTime)
             {
-                _endTime = _endTime.AddDays(1);
-                _is24H = true;
+                Counters.EndTime = GetNextEnd(GetNextEnd(1) <= Counters.StartTime ? 2 : 1);
+                Config.Is24H = true;
             }
 
             //If there are holidays, account for them
-            if (Holidays.Any(holiday => _startTime >= holiday.UtcStart && _startTime < holiday.UtcEnd))
+            if (Config.Holidays.Any(holiday =>
+                Counters.StartTime >= holiday.UtcStart && Counters.StartTime < holiday.UtcEnd))
             {
-                _startTime = _startTime.AddDays(Holidays.Any(holiday =>
-                    _startTime.AddDays(1) >= holiday.UtcStart && _startTime.AddDays(1) < holiday.UtcEnd)
+                Counters.StartTime = GetNextStart(Config.Holidays.Any(holiday =>
+                    GetNextStart(1) >= holiday.UtcStart && GetNextStart(1) < holiday.UtcEnd)
                     ? 2
                     : 1);
-                _endTime = _endTime.AddDays(_endTime.AddDays(1) < _startTime ? 2 : 1);
+
+                Counters.EndTime = GetNextEnd(GetNextEnd(1) < Counters.StartTime ? 2 : 1);
             }
 
             //If we updated holidays or this is a 24h instance, don't automatically put start time to the future
-            if (!_is24H &&
-                (!UseTestOverrideTime && _startTime < utcDate ||
-                 UseTestOverrideTime && _startTime < TestOverrideTime.ToUniversalTime()) &&
-                !isUpdateHolidays) _startTime = _startTime.AddDays(1);
+            if (!Config.Is24H &&
+                (!Config.UseTestOverrideTime && Counters.StartTime < utcDate || Config.UseTestOverrideTime &&
+                    Counters.StartTime < Config.TestOverrideTime.ToUniversalTime()) &&
+                !isUpdateHolidays)
+                Counters.StartTime = GetNextStart(GetNextStart(1) < utcDate ? 2 : 1);
 
-            if (_endTime < _startTime)
-                _endTime = _endTime.AddDays(_endTime.AddDays(1) < _startTime ? 2 : 1);
+            if (Counters.EndTime < Counters.StartTime)
+                Counters.EndTime = GetNextEnd(GetNextEnd(1) < Counters.StartTime ? 2 : 1);
 
             LogEvent(LogEventLevel.Debug,
                 isUpdateHolidays
                     ? "UTC Day Rollover (Holidays Updated), Parse {LocalStart} To Next UTC Start Time {StartTime} ({StartDayOfWeek}), Parse {LocalEnd} to UTC End Time {EndTime} ({EndDayOfWeek})..."
                     : "UTC Day Rollover, Parse {LocalStart} To Next UTC Start Time {StartTime} ({StartDayOfWeek}), Parse {LocalEnd} to UTC End Time {EndTime} ({EndDayOfWeek})...",
-                StartTime, _startTime.ToShortTimeString(), _startTime.DayOfWeek, EndTime,
-                _endTime.ToShortTimeString(), _endTime.DayOfWeek);
+                StartTime, Counters.StartTime.ToShortTimeString(), Counters.StartTime.DayOfWeek, EndTime,
+                Counters.EndTime.ToShortTimeString(), Counters.EndTime.DayOfWeek);
         }
 
+        public DateTime GetNextStart(int addDays = 0)
+        {
+            return Dates.ParseUtcIntervalDate(Counters.StartTime.AddDays(addDays), StartTime, Config.StartFormat);
+        }
+
+        public DateTime GetNextEnd(int addDays = 0)
+        {
+            return Dates.ParseUtcIntervalDate(Counters.EndTime.AddDays(addDays), EndTime, Config.EndFormat);
+        }
+        
         public Showtime GetShowtime()
         {
-            return new Showtime(_startTime, _endTime);
+            return new Showtime(Counters.StartTime, Counters.EndTime);
         }
 
         /// <summary>
-        ///     Output a scheduled log event that always defines the Message and Description tags for use with other apps
+        ///     Output a timeout event that always defines the Message and Description tags for use with other apps
         /// </summary>
         /// <param name="logLevel"></param>
         /// <param name="message"></param>
         /// <param name="description"></param>
         /// <param name="token"></param>
-        private void ScheduledLogEvent(LogEventLevel logLevel, string message, string description,
+        private void LogThresholdEvent(LogEventLevel logLevel, string message, string description,
             KeyValuePair<string, string>? token = null)
         {
             var include = "{AppName} - ";
-            if (!_includeApp) include = string.Empty;
+            if (!Config.IncludeApp) include = string.Empty;
 
-            var responder = string.Empty;
-            if (ResponderLookup.Count > 0)
-            {
-                if (token != null)
-                    foreach (var responderPair in from responderPair in ResponderLookup
-                        let tokenPair = (KeyValuePair<string, string>) token
-                        where responderPair.Key.Equals(tokenPair.Key, StringComparison.OrdinalIgnoreCase)
-                        select responderPair)
-                    {
-                        responder = responderPair.Value;
-                        break;
-                    }
-            }
-            else
-            {
-                responder = _responders;
-            }
-
-
-            if (_isTags)
-                Log.ForContext(nameof(Tags), DateTokens.HandleTokens(_tags, token)).ForContext("AppName", App.Title)
-                    .ForContext(nameof(Priority), _priority).ForContext(nameof(Responders), responder)
-                    .ForContext(nameof(InitialTimeEstimate), _initialTimeEstimate)
-                    .ForContext(nameof(RemainingTimeEstimate), _remainingTimeEstimate)
-                    .ForContext(nameof(ProjectKey), _projectKey).ForContext(nameof(DueDate), _dueDate)
-                    .ForContext(nameof(EventCount), EventCount).ForContext("Message", message)
-                    .ForContext("Description", description)
-                    .Write((Serilog.Events.LogEventLevel) logLevel,
-                        string.IsNullOrEmpty(description) || !_includeDescription
-                            ? include + "{Message}"
-                            : include + "{Message} : {Description}");
-            else
-                Log.ForContext("AppName", App.Title).ForContext(nameof(Priority), _priority)
-                    .ForContext(nameof(Responders), responder).ForContext(nameof(EventCount), EventCount)
-                    .ForContext(nameof(InitialTimeEstimate), _initialTimeEstimate)
-                    .ForContext(nameof(RemainingTimeEstimate), _remainingTimeEstimate)
-                    .ForContext(nameof(ProjectKey), _projectKey).ForContext(nameof(DueDate), _dueDate)
-                    .ForContext("Message", message).ForContext("Description", description)
-                    .Write((Serilog.Events.LogEventLevel) logLevel,
-                        string.IsNullOrEmpty(description) || !_includeDescription
-                            ? include + "{Message}"
-                            : include + "{Message} : {Description}");
+            Log.ForContext(nameof(Tags),
+                    Config.IsTags ? DateTokens.HandleTokens(Config.Tags, token) : new List<string>())
+                .ForContext("AppName", Config.AppName)
+                .ForContext(nameof(Priority), Config.Priority).ForContext(nameof(Responders), Config.Responders)
+                .ForContext(nameof(InitialTimeEstimate), Config.InitialTimeEstimate)
+                .ForContext(nameof(RemainingTimeEstimate), Config.RemainingTimeEstimate)
+                .ForContext(nameof(ProjectKey), Config.ProjectKey).ForContext(nameof(DueDate), Config.DueDate)
+                .ForContext("EventCount", Counters.EventCount).ForContext("Message", DateTokens.HandleTokens(message))
+                .ForContext("Description", DateTokens.HandleTokens(description))
+                .Write((Serilog.Events.LogEventLevel)logLevel,
+                    string.IsNullOrEmpty(description) || !Config.IncludeDescription
+                        ? include + "{Message}"
+                        : include + "{Message} : {Description}");
         }
 
         /// <summary>
@@ -1120,24 +1029,26 @@ namespace Seq.App.EventThreshold
         {
             var logArgsList = args.ToList();
 
-            if (_includeApp)
-            {
-                logArgsList.Insert(0, App.Title);
-            }
+            if (Config.IncludeApp) logArgsList.Insert(0, Config.AppName);
 
             var logArgs = logArgsList.ToArray();
 
-            if (_isTags)
-                Log.ForContext(nameof(Tags), _tags).ForContext("AppName", App.Title)
-                    .ForContext(nameof(Priority), _priority).ForContext(nameof(Responders), _responders)
-                    .ForContext(nameof(EventCount), EventCount).ForContext(nameof(InitialTimeEstimate), _initialTimeEstimate)
-                    .ForContext(nameof(RemainingTimeEstimate), _remainingTimeEstimate)
-                    .ForContext(nameof(ProjectKey), _projectKey).ForContext(nameof(DueDate), _dueDate)
-                    .Write((Serilog.Events.LogEventLevel) logLevel, _includeApp ? "[{AppName}] - " + message : message, logArgs);
+            if (Config.IsTags)
+                Log.ForContext(nameof(Tags), Config.Tags).ForContext("AppName", Config.AppName)
+                    .ForContext(nameof(Priority), Config.Priority).ForContext(nameof(Responders), Config.Responders)
+                    .ForContext(nameof(Counters.EventCount), Counters.EventCount).ForContext(nameof(InitialTimeEstimate), Config.InitialTimeEstimate)
+                    .ForContext(nameof(RemainingTimeEstimate), Config.RemainingTimeEstimate)
+                    .ForContext(nameof(ProjectKey), Config.ProjectKey).ForContext(nameof(DueDate), Config.DueDate)
+                    .Write((Serilog.Events.LogEventLevel)logLevel,
+                        Config.IncludeApp ? "[{AppName}] - " + message : message, logArgs);
             else
-                Log.ForContext("AppName", App.Title).ForContext(nameof(Priority), _priority)
-                    .ForContext(nameof(Responders), _responders).ForContext(nameof(EventCount), EventCount)
-                    .Write((Serilog.Events.LogEventLevel) logLevel, _includeApp ? "[{AppName}] - " + message : message, logArgs);
+                Log.ForContext("AppName", Config.AppName).ForContext(nameof(Priority), Config.Priority)
+                    .ForContext(nameof(Responders), Config.Responders)
+                    .ForContext(nameof(InitialTimeEstimate), Config.InitialTimeEstimate)
+                    .ForContext(nameof(RemainingTimeEstimate), Config.RemainingTimeEstimate)
+                    .ForContext(nameof(ProjectKey), Config.ProjectKey).ForContext(nameof(DueDate), Config.DueDate)
+                    .Write((Serilog.Events.LogEventLevel)logLevel,
+                        Config.IncludeApp ? "[{AppName}] - " + message : message, logArgs);
         }
 
         /// <summary>
@@ -1151,27 +1062,26 @@ namespace Seq.App.EventThreshold
         {
             var logArgsList = args.ToList();
 
-            if (_includeApp)
-            {
-                logArgsList.Insert(0, App.Title);
-            }
+            if (Config.IncludeApp) logArgsList.Insert(0, Config.AppName);
 
             var logArgs = logArgsList.ToArray();
 
-            if (_isTags)
-                Log.ForContext(nameof(Tags), _tags).ForContext("AppName", App.Title)
-                    .ForContext(nameof(Priority), _priority).ForContext(nameof(Responders), _responders)
-                    .ForContext(nameof(EventCount), EventCount).ForContext(nameof(InitialTimeEstimate), _initialTimeEstimate)
-                    .ForContext(nameof(RemainingTimeEstimate), _remainingTimeEstimate)
-                    .ForContext(nameof(ProjectKey), _projectKey).ForContext(nameof(DueDate), _dueDate)
-                    .Write((Serilog.Events.LogEventLevel) logLevel, exception, _includeApp ? "[{AppName}] - " + message : message, logArgs);
+            if (Config.IsTags)
+                Log.ForContext(nameof(Tags), Config.Tags).ForContext("AppName", Config.AppName)
+                    .ForContext(nameof(Priority), Config.Priority).ForContext(nameof(Responders), Config.Responders)
+                    .ForContext(nameof(Counters.EventCount), Counters.EventCount).ForContext(nameof(InitialTimeEstimate), Config.InitialTimeEstimate)
+                    .ForContext(nameof(RemainingTimeEstimate), Config.RemainingTimeEstimate)
+                    .ForContext(nameof(ProjectKey), Config.ProjectKey).ForContext(nameof(DueDate), Config.DueDate)
+                    .Write((Serilog.Events.LogEventLevel)logLevel, exception,
+                        Config.IncludeApp ? "[{AppName}] - " + message : message, logArgs);
             else
-                Log.ForContext("AppName", App.Title).ForContext(nameof(Priority), _priority)
-                    .ForContext(nameof(Responders), _responders).ForContext(nameof(EventCount), EventCount)
-                    .ForContext(nameof(InitialTimeEstimate), _initialTimeEstimate)
-                    .ForContext(nameof(RemainingTimeEstimate), _remainingTimeEstimate)
-                    .ForContext(nameof(ProjectKey), _projectKey).ForContext(nameof(DueDate), _dueDate)
-                    .Write((Serilog.Events.LogEventLevel) logLevel, exception, _includeApp ? "[{AppName}] - " + message : message, logArgs);
+                Log.ForContext("AppName", Config.AppName).ForContext(nameof(Priority), Config.Priority)
+                    .ForContext(nameof(Responders), Config.Responders)
+                    .ForContext(nameof(InitialTimeEstimate), Config.InitialTimeEstimate)
+                    .ForContext(nameof(RemainingTimeEstimate), Config.RemainingTimeEstimate)
+                    .ForContext(nameof(ProjectKey), Config.ProjectKey).ForContext(nameof(DueDate), Config.DueDate)
+                    .Write((Serilog.Events.LogEventLevel)logLevel, exception,
+                        Config.IncludeApp ? "[{AppName}] - " + message : message, logArgs);
         }
     }
 }
