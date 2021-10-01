@@ -471,20 +471,20 @@ namespace Seq.App.EventThreshold
                 LogEvent(LogEventLevel.Debug, "UTC Days of Week {DaysOfWeek} will be used ...", Config.DaysOfWeek.ToArray());
 
             if (Config.Diagnostics)
-                LogEvent(LogEventLevel.Debug, "Validate Include Days of Month {Config.IncludeDays} ...", IncludeDaysOfMonth);
+                LogEvent(LogEventLevel.Debug, "Validate Include Days of Month {IncludeDays} ...", IncludeDaysOfMonth);
 
             Config.IncludeDays = Dates.GetUtcDaysOfMonth(IncludeDaysOfMonth, StartTime, Config.StartFormat, DateTime.Now);
             if (Config.IncludeDays.Count > 0)
-                LogEvent(LogEventLevel.Debug, "Include UTC Days of Month: {Config.IncludeDays} ...", Config.IncludeDays.ToArray());
+                LogEvent(LogEventLevel.Debug, "Include UTC Days of Month: {IncludeDays} ...", Config.IncludeDays.ToArray());
             else
                 LogEvent(LogEventLevel.Debug, "Include UTC Days of Month: ALL ...");
 
             if (Config.Diagnostics)
-                LogEvent(LogEventLevel.Debug, "Validate Exclude Days of Month {Config.ExcludeDays} ...", ExcludeDaysOfMonth);
+                LogEvent(LogEventLevel.Debug, "Validate Exclude Days of Month {ExcludeDays} ...", ExcludeDaysOfMonth);
 
             Config.ExcludeDays = Dates.GetUtcDaysOfMonth(ExcludeDaysOfMonth, StartTime, Config.StartFormat, DateTime.Now);
             if (Config.ExcludeDays.Count > 0)
-                LogEvent(LogEventLevel.Debug, "Exclude UTC Days of Month: {Config.ExcludeDays} ...", Config.ExcludeDays.ToArray());
+                LogEvent(LogEventLevel.Debug, "Exclude UTC Days of Month: {ExcludeDays} ...", Config.ExcludeDays.ToArray());
             else
                 LogEvent(LogEventLevel.Debug, "Exclude UTC Days of Month: NONE ...");
 
@@ -666,7 +666,7 @@ namespace Seq.App.EventThreshold
                         }
 
                         if (Config.LogEventCount)
-                            LogEvent(LogEventLevel.Debug, "Event count after {ThresholdInterval} seconds: {Counters.EventCount}",
+                            LogEvent(LogEventLevel.Debug, "Event count after {ThresholdInterval} seconds: {EventCount}",
                                 Config.ThresholdInterval.TotalSeconds, Counters.EventCount);
 
                         //Reset the threshold counter
@@ -698,12 +698,12 @@ namespace Seq.App.EventThreshold
             //Take the opportunity to refresh include/exclude days to allow for month rollover
             Config.IncludeDays = Dates.GetUtcDaysOfMonth(IncludeDaysOfMonth, StartTime, Config.StartFormat, DateTime.Now);
             if (Config.IncludeDays.Count > 0)
-                LogEvent(LogEventLevel.Debug, "Include UTC Days of Month: {Config.IncludeDays} ...",
+                LogEvent(LogEventLevel.Debug, "Include UTC Days of Month: {IncludeDays} ...",
                     Config.IncludeDays.ToArray());
 
             Config.ExcludeDays = Dates.GetUtcDaysOfMonth(ExcludeDaysOfMonth, StartTime, Config.StartFormat, DateTime.Now);
             if (Config.ExcludeDays.Count > 0)
-                LogEvent(LogEventLevel.Debug, "Exclude UTC Days of Month: {Config.ExcludeDays} ...",
+                LogEvent(LogEventLevel.Debug, "Exclude UTC Days of Month: {ExcludeDays} ...",
                     Config.ExcludeDays.ToArray());
         }
 
