@@ -212,6 +212,13 @@ namespace Seq.App.EventThreshold
         public bool? IncludeDescription { get; set; } = false;
 
         [SeqAppSetting(
+            DisplayName = "Use Handlebars templates in message and description",
+            HelpText =
+                "if selected, the configured message and description will be rendered using Handlebars. Don't select this if you want to render in another app.",
+            IsOptional = true)]
+        public bool? UseHandlebars { get; set; } = false;
+
+        [SeqAppSetting(
             IsOptional = true,
             DisplayName = "Alert tags",
             HelpText =
@@ -370,6 +377,7 @@ namespace Seq.App.EventThreshold
 
         protected override void OnAttached()
         {
+            Config.AppName = App.Title;
             LogEvent(LogEventLevel.Debug, "Check {AppName} diagnostic level ({Diagnostics}) ...", App.Title,
                 Diagnostics);
             Config.Diagnostics = Diagnostics;
@@ -485,6 +493,12 @@ namespace Seq.App.EventThreshold
             if (Config.Diagnostics)
                 LogEvent(LogEventLevel.Debug, "Match criteria will be: {MatchText}",
                     PropertyMatch.MatchConditions(Config.Properties));
+
+            if (UseHandlebars != null) Config.UseHandlebars = (bool)UseHandlebars;
+            if (Config.Diagnostics)
+                LogEvent(LogEventLevel.Debug,
+                    "Use Handlebars to render Log Message and Description: '{UseHandlebars}' ...",
+                    Config.UseHandlebars);
 
             if (Config.Diagnostics)
                 LogEvent(LogEventLevel.Debug, "Validate Alert Message '{AlertMessage}' ...", AlertMessage);
