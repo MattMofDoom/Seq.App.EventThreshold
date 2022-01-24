@@ -3,20 +3,22 @@ using System.Collections.Generic;
 using Lurgle.Dates.Classes;
 using Seq.Apps.LogEvents;
 
+// ReSharper disable UnusedAutoPropertyAccessor.Global
+
 namespace Seq.App.EventThreshold.Classes
 {
     public class ThresholdConfig
     {
+        public bool LogEventCount;
+        public int Threshold;
+        public TimeSpan ThresholdInterval;
+        public LogEventLevel ThresholdLogLevel;
         public string AppName { get; set; }
         public bool BypassLocal { get; set; }
         public List<DayOfWeek> DaysOfWeek { get; set; } = new List<DayOfWeek>();
         public string DueDate { get; set; }
         public string EndFormat { get; set; } = "H:mm:ss";
         public bool InvertThreshold { get; set; }
-        public int Threshold;
-        public TimeSpan ThresholdInterval;
-        public LogEventLevel ThresholdLogLevel;
-        public bool LogEventCount;
         public bool IncludeApp { get; set; }
         public bool IncludeBank { get; set; }
         public bool IncludeDescription { get; set; }

@@ -1,5 +1,7 @@
 ﻿using System;
 
+// ReSharper disable UnusedMember.Global
+
 namespace Seq.App.EventThreshold.Classes
 {
     public class ThresholdCounters
