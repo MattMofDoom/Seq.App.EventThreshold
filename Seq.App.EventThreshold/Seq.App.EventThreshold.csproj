@@ -29,9 +29,9 @@
       - Address DST inconsistencies
       - Update dependencies
       - Code cleanup
-
+      Resolve error in calculating days of month for shorter months      -
     </PackageReleaseNotes>
-    <Version>1.0.16</Version>
+    <Version>1.0.17</Version>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
 
@@ -42,7 +42,7 @@
 
   <ItemGroup>
     <PackageReference Include="Handlebars.Net" Version="2.1.0" />
-    <PackageReference Include="Lurgle.Dates" Version="1.0.13" />
+    <PackageReference Include="Lurgle.Dates" Version="1.0.14" />
     <PackageReference Include="Seq.Apps" Version="2021.4.0" />
   </ItemGroup>
 
@@ -55,7 +55,10 @@
       <Pack>True</Pack>
       <PackagePath></PackagePath>
     </None>
-    <None Include="$(OutDir)/**/Flurl.Http.dll;$(OutDir)/**/Flurl.dll;$(OutDir)/**/Lurgle.Dates.dll;$(OutDir)/**/Handlebars.dll;" Exclude="$(OutDir)/$(MSBuildProjectName).dll;$(OutDir)/Seq.Apps.dll;$(OutDir)/Serilog.dll" Pack="true" PackagePath="lib/$(TargetFramework)" />
+    <None
+      Include="$(OutDir)/**/Flurl.Http.dll;$(OutDir)/**/Flurl.dll;$(OutDir)/**/Lurgle.Dates.dll;$(OutDir)/**/Handlebars.dll;"
+      Exclude="$(OutDir)/$(MSBuildProjectName).dll;$(OutDir)/Seq.Apps.dll;$(OutDir)/Serilog.dll" Pack="true"
+      PackagePath="lib/$(TargetFramework)" />
     <!--<None Include="./bin/release/$(TargetFramework)/Flurl.dll" Pack="true" PackagePath="lib/$(TargetFramework)" />
     <None Include="./bin/release/$(TargetFramework)/Flurl.Http.dll" Pack="true" PackagePath="lib/$(TargetFramework)" />-->
   </ItemGroup>
